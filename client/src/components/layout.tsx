@@ -59,15 +59,30 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Global FAB (Mobile) */}
-      <div className="md:hidden fixed bottom-24 right-4 z-[100] pointer-events-none">
-        <div className="pointer-events-auto relative">
+      <div className="md:hidden">
+        <AnimatePresence>
+          {isFabOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[90] bg-background/20 backdrop-blur-sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsFabOpen(false);
+              }}
+            />
+          )}
+        </AnimatePresence>
+
+        <div className="fixed bottom-24 right-4 z-[100] flex flex-col items-end">
           <AnimatePresence>
             {isFabOpen && (
               <motion.div 
                 initial={{ opacity: 0, y: 10, scale: 0.9 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.9 }}
-                className="absolute bottom-16 right-0 flex flex-col gap-3 items-end mb-2"
+                className="flex flex-col gap-4 items-end mb-4 origin-bottom-right"
               >
                 {[
                   { label: "Schedule Focus", icon: Target },
@@ -83,13 +98,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       console.log(`Clicked ${action.label}`);
                       setIsFabOpen(false);
                     }}
-                    className="flex items-center gap-3 group pointer-events-auto active:scale-95 transition-transform"
+                    className="flex items-center gap-3 group active:scale-95 transition-transform cursor-pointer w-full justify-end"
                   >
-                    <span className="bg-background/90 backdrop-blur-md px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm border">
+                    <span className="bg-background/95 px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg border text-foreground">
                       {action.label}
                     </span>
-                    <div className="h-10 w-10 rounded-full bg-card border shadow-sm flex items-center justify-center text-foreground group-hover:bg-secondary transition-colors">
-                      <action.icon className="w-4 h-4" />
+                    <div className="h-12 w-12 rounded-full bg-card border shadow-lg flex items-center justify-center text-foreground group-active:bg-secondary transition-colors shrink-0">
+                      <action.icon className="w-5 h-5" />
                     </div>
                   </button>
                 ))}
@@ -104,7 +119,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               setIsFabOpen(!isFabOpen);
             }}
             className={cn(
-              "h-14 w-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 pointer-events-auto relative z-10",
+              "h-14 w-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 relative z-[100] active:scale-95",
               isFabOpen ? "bg-secondary text-foreground rotate-45" : "bg-primary text-primary-foreground"
             )}
           >

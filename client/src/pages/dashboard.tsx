@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { Link } from "wouter";
 import { Plus, Check, Circle, Flame, ArrowRight, Mic, Play, ChevronDown, ChevronRight, CalendarClock, MoreHorizontal, X, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";

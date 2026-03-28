@@ -59,43 +59,58 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Global FAB (Mobile) */}
-      <div className="md:hidden fixed bottom-24 right-4 z-50">
-        <AnimatePresence>
-          {isFabOpen && (
-            <motion.div 
-              initial={{ opacity: 0, y: 10, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.9 }}
-              className="absolute bottom-16 right-0 flex flex-col gap-3 items-end mb-2"
-            >
-              {[
-                { label: "Schedule Focus", icon: Target },
-                { label: "Add Routine", icon: RefreshCw },
-                { label: "Add Note", icon: PenSquare },
-                { label: "Add Task", icon: Plus },
-              ].map((action, i) => (
-                <button key={i} className="flex items-center gap-3 group">
-                  <span className="bg-background/90 backdrop-blur-md px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm border">
-                    {action.label}
-                  </span>
-                  <div className="h-10 w-10 rounded-full bg-card border shadow-sm flex items-center justify-center text-foreground group-hover:bg-secondary transition-colors">
-                    <action.icon className="w-4 h-4" />
-                  </div>
-                </button>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-        
-        <button 
-          onClick={() => setIsFabOpen(!isFabOpen)}
-          className={cn(
-            "h-14 w-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300",
-            isFabOpen ? "bg-secondary text-foreground rotate-45" : "bg-primary text-primary-foreground"
-          )}
-        >
-          <Plus className="w-6 h-6" />
-        </button>
+      <div className="md:hidden fixed bottom-24 right-4 z-[100] pointer-events-none">
+        <div className="pointer-events-auto relative">
+          <AnimatePresence>
+            {isFabOpen && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                className="absolute bottom-16 right-0 flex flex-col gap-3 items-end mb-2"
+              >
+                {[
+                  { label: "Schedule Focus", icon: Target },
+                  { label: "Add Routine", icon: RefreshCw },
+                  { label: "Add Note", icon: PenSquare },
+                  { label: "Add Task", icon: Plus },
+                ].map((action, i) => (
+                  <button 
+                    key={i} 
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      console.log(`Clicked ${action.label}`);
+                      setIsFabOpen(false);
+                    }}
+                    className="flex items-center gap-3 group pointer-events-auto active:scale-95 transition-transform"
+                  >
+                    <span className="bg-background/90 backdrop-blur-md px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm border">
+                      {action.label}
+                    </span>
+                    <div className="h-10 w-10 rounded-full bg-card border shadow-sm flex items-center justify-center text-foreground group-hover:bg-secondary transition-colors">
+                      <action.icon className="w-4 h-4" />
+                    </div>
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          <button 
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsFabOpen(!isFabOpen);
+            }}
+            className={cn(
+              "h-14 w-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 pointer-events-auto relative z-10",
+              isFabOpen ? "bg-secondary text-foreground rotate-45" : "bg-primary text-primary-foreground"
+            )}
+          >
+            <Plus className="w-6 h-6" />
+          </button>
+        </div>
       </div>
 
       {/* Mobile Bottom Nav */}

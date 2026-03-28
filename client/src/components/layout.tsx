@@ -60,68 +60,64 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Global FAB (Mobile) */}
       <div className="md:hidden">
-        <AnimatePresence>
-          {isFabOpen && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[90] bg-background/20 backdrop-blur-sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsFabOpen(false);
-              }}
-            />
-          )}
-        </AnimatePresence>
+        {/* Backdrop */}
+        {isFabOpen && (
+          <div
+            className="fixed inset-0 z-[9990] bg-background/60 backdrop-blur-sm"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsFabOpen(false);
+            }}
+            aria-hidden="true"
+          />
+        )}
 
-        <div className="fixed bottom-24 right-4 z-[100] flex flex-col items-end">
-          <AnimatePresence>
-            {isFabOpen && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10, scale: 0.9 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.9 }}
-                className="flex flex-col gap-4 items-end mb-4 origin-bottom-right"
-              >
-                {[
-                  { label: "Schedule Focus", icon: Target },
-                  { label: "Add Routine", icon: RefreshCw },
-                  { label: "Add Note", icon: PenSquare },
-                  { label: "Add Task", icon: Plus },
-                ].map((action, i) => (
-                  <button 
-                    key={i} 
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      console.log(`Clicked ${action.label}`);
-                      setIsFabOpen(false);
-                    }}
-                    className="flex items-center gap-3 group active:scale-95 transition-transform cursor-pointer w-full justify-end"
-                  >
-                    <span className="bg-background/95 px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg border text-foreground">
-                      {action.label}
-                    </span>
-                    <div className="h-12 w-12 rounded-full bg-card border shadow-lg flex items-center justify-center text-foreground group-active:bg-secondary transition-colors shrink-0">
-                      <action.icon className="w-5 h-5" />
-                    </div>
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+        {/* FAB Container */}
+        <div className="fixed bottom-24 right-4 z-[9999] flex flex-col items-end">
+          {/* Action Menu */}
+          {isFabOpen && (
+            <div className="flex flex-col gap-4 items-end mb-4">
+              {[
+                { label: "Schedule Focus", icon: Target },
+                { label: "Add Routine", icon: RefreshCw },
+                { label: "Add Note", icon: PenSquare },
+                { label: "Add Task", icon: Plus },
+              ].map((action, i) => (
+                <button 
+                  key={i}
+                  type="button"
+                  className="flex items-center justify-end gap-3 w-full bg-transparent border-none p-0 cursor-pointer outline-none m-0"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log(`Clicked ${action.label}`);
+                    setIsFabOpen(false);
+                  }}
+                >
+                  <div className="bg-background px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg border text-foreground">
+                    {action.label}
+                  </div>
+                  <div className="h-12 w-12 rounded-full bg-card border shadow-lg flex items-center justify-center text-foreground">
+                    <action.icon className="w-5 h-5" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
           
+          {/* Main Toggle Button */}
           <button 
             type="button"
+            className={cn(
+              "h-14 w-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 outline-none cursor-pointer border-none m-0 p-0",
+              isFabOpen ? "bg-secondary text-foreground rotate-45" : "bg-primary text-primary-foreground"
+            )}
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               setIsFabOpen(!isFabOpen);
             }}
-            className={cn(
-              "h-14 w-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 relative z-[100] active:scale-95",
-              isFabOpen ? "bg-secondary text-foreground rotate-45" : "bg-primary text-primary-foreground"
-            )}
           >
             <Plus className="w-6 h-6" />
           </button>

@@ -48,40 +48,45 @@ export default function Focus() {
   };
 
   return (
-    <div className="min-h-[80vh] flex flex-col items-center justify-center p-4 animate-in fade-in duration-500 max-w-3xl mx-auto relative">
+    <div className="min-h-[100dvh] md:min-h-[80vh] flex flex-col items-center justify-center p-4 animate-in fade-in duration-500 max-w-3xl mx-auto relative overflow-hidden">
       
       {/* Ambient background glow based on mode */}
       <div className={cn(
-        "absolute inset-0 -z-10 blur-[100px] opacity-20 transition-colors duration-1000",
-        mode === 'focus' ? "bg-primary/40" : mode === 'shortBreak' ? "bg-green-500/40" : "bg-blue-500/40"
+        "absolute inset-0 -z-10 blur-[120px] opacity-30 transition-colors duration-1000",
+        mode === 'focus' ? "bg-primary/40" : mode === 'shortBreak' ? "bg-green-500/40" : "bg-blue-500/40",
+        isActive && "animate-pulse"
       )} />
 
       {/* Header controls */}
       <div className="absolute top-8 left-4 right-4 flex justify-between items-center max-w-5xl mx-auto w-full px-4">
-        <div className="bg-card border rounded-full px-4 py-2 text-sm font-medium shadow-sm flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-          Focus Session
+        <div className="bg-card/80 backdrop-blur border rounded-full px-4 py-2 text-sm font-medium shadow-sm flex items-center gap-2">
+          <span className={cn(
+            "w-2 h-2 rounded-full",
+            mode === 'focus' ? "bg-primary" : mode === 'shortBreak' ? "bg-green-500" : "bg-blue-500",
+            isActive && "animate-pulse"
+          )} />
+          {mode === 'focus' ? "Focus Session" : mode === 'shortBreak' ? "Short Break" : "Long Break"}
         </div>
         
         <div className="flex gap-2">
-          <button className="p-2.5 rounded-full bg-card border hover:bg-secondary text-muted-foreground transition-colors">
+          <button className="p-2.5 rounded-full bg-card/80 backdrop-blur border hover:bg-secondary text-muted-foreground transition-colors hidden sm:block">
             <Volume2 className="w-4 h-4" />
           </button>
-          <button className="p-2.5 rounded-full bg-card border hover:bg-secondary text-muted-foreground transition-colors">
+          <button className="p-2.5 rounded-full bg-card/80 backdrop-blur border hover:bg-secondary text-muted-foreground transition-colors">
             <Settings className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      <div className="w-full max-w-md flex flex-col items-center">
+      <div className="w-full max-w-md flex flex-col items-center mt-8">
         
         {/* Mode Selector */}
-        <div className="flex p-1 bg-secondary/50 rounded-xl mb-12 border shadow-inner">
+        <div className="flex p-1.5 bg-secondary/50 backdrop-blur rounded-2xl mb-12 border shadow-inner w-full max-w-[320px]">
           <button 
             onClick={() => switchMode('focus')}
             className={cn(
-              "px-4 py-2 rounded-lg text-sm font-medium transition-all",
-              mode === 'focus' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              "flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all",
+              mode === 'focus' ? "bg-background text-foreground shadow-sm scale-100" : "text-muted-foreground hover:text-foreground scale-95 hover:scale-100"
             )}
           >
             Focus
@@ -89,8 +94,8 @@ export default function Focus() {
           <button 
             onClick={() => switchMode('shortBreak')}
             className={cn(
-              "px-4 py-2 rounded-lg text-sm font-medium transition-all",
-              mode === 'shortBreak' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              "flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all",
+              mode === 'shortBreak' ? "bg-background text-foreground shadow-sm scale-100" : "text-muted-foreground hover:text-foreground scale-95 hover:scale-100"
             )}
           >
             Short Break
@@ -98,8 +103,8 @@ export default function Focus() {
           <button 
             onClick={() => switchMode('longBreak')}
             className={cn(
-              "px-4 py-2 rounded-lg text-sm font-medium transition-all",
-              mode === 'longBreak' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              "flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all",
+              mode === 'longBreak' ? "bg-background text-foreground shadow-sm scale-100" : "text-muted-foreground hover:text-foreground scale-95 hover:scale-100"
             )}
           >
             Long Break
@@ -107,53 +112,55 @@ export default function Focus() {
         </div>
 
         {/* Timer Display */}
-        <div className="relative flex items-center justify-center mb-12">
+        <div className="relative flex items-center justify-center mb-16 scale-90 sm:scale-100">
           {/* Progress Ring */}
-          <svg className="absolute w-[320px] h-[320px] -rotate-90">
+          <svg className="absolute w-[340px] h-[340px] -rotate-90">
             <circle 
-              cx="160" cy="160" r="150" 
+              cx="170" cy="170" r="160" 
               fill="none" 
               stroke="currentColor" 
               strokeWidth="4" 
-              className="text-secondary/50" 
+              className="text-secondary/60" 
             />
             <motion.circle 
-              cx="160" cy="160" r="150" 
+              cx="170" cy="170" r="160" 
               fill="none" 
               stroke="currentColor" 
-              strokeWidth="6" 
+              strokeWidth="8" 
               strokeLinecap="round"
               className={cn(
                 "transition-all duration-1000",
-                mode === 'focus' ? "text-primary" : mode === 'shortBreak' ? "text-green-500" : "text-blue-500"
+                mode === 'focus' ? "text-primary drop-shadow-[0_0_8px_rgba(var(--primary),0.5)]" : 
+                mode === 'shortBreak' ? "text-green-500 drop-shadow-[0_0_8px_rgba(34,197,94,0.5)]" : 
+                "text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]"
               )}
-              strokeDasharray={`${150 * 2 * Math.PI}`}
-              strokeDashoffset={`${(150 * 2 * Math.PI) * (1 - progress / 100)}`}
-              initial={{ strokeDashoffset: 150 * 2 * Math.PI }}
-              animate={{ strokeDashoffset: (150 * 2 * Math.PI) * (1 - progress / 100) }}
+              strokeDasharray={`${160 * 2 * Math.PI}`}
+              strokeDashoffset={`${(160 * 2 * Math.PI) * (1 - progress / 100)}`}
+              initial={{ strokeDashoffset: 160 * 2 * Math.PI }}
+              animate={{ strokeDashoffset: (160 * 2 * Math.PI) * (1 - progress / 100) }}
             />
           </svg>
 
           {/* Time Text */}
           <div className="flex flex-col items-center z-10 text-center mt-4">
-            <span className="font-display text-8xl font-bold tracking-tighter text-foreground" style={{ fontVariantNumeric: 'tabular-nums' }}>
+            <span className="font-display text-[6rem] sm:text-8xl font-bold tracking-tighter text-foreground leading-none" style={{ fontVariantNumeric: 'tabular-nums' }}>
               {formatTime(time)}
             </span>
             <input 
               type="text" 
               value={taskName}
               onChange={(e) => setTaskName(e.target.value)}
-              className="mt-4 bg-transparent border-none text-center text-muted-foreground hover:text-foreground outline-none focus:ring-2 focus:ring-primary/20 rounded-md px-4 py-1 text-sm font-medium transition-colors w-full max-w-[200px]"
+              className="mt-6 bg-secondary/30 backdrop-blur border-none text-center text-muted-foreground hover:text-foreground outline-none focus:ring-2 focus:ring-primary/50 rounded-xl px-4 py-2 text-sm font-medium transition-colors w-full max-w-[240px]"
               placeholder="What are you working on?"
             />
           </div>
         </div>
 
         {/* Controls */}
-        <div className="flex items-center justify-center gap-6">
+        <div className="flex items-center justify-center gap-6 sm:gap-8">
           <button 
             onClick={resetTimer}
-            className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shadow-sm border border-transparent hover:border-border"
+            className="w-14 h-14 rounded-full bg-secondary/80 backdrop-blur flex items-center justify-center text-muted-foreground hover:text-foreground transition-all shadow-sm border border-transparent hover:border-border hover:scale-105 active:scale-95"
           >
             <RotateCcw className="w-5 h-5" />
           </button>
@@ -161,9 +168,9 @@ export default function Focus() {
           <button 
             onClick={toggleTimer}
             className={cn(
-              "w-20 h-20 rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-105 active:scale-95",
+              "w-24 h-24 rounded-full flex items-center justify-center shadow-xl transition-all hover:scale-105 active:scale-95",
               isActive 
-                ? "bg-secondary text-foreground border" 
+                ? "bg-secondary text-foreground border-2 border-border" 
                 : mode === 'focus' 
                   ? "bg-primary text-primary-foreground" 
                   : mode === 'shortBreak'
@@ -172,13 +179,13 @@ export default function Focus() {
             )}
           >
             {isActive ? (
-              <Pause className="w-8 h-8 fill-current" />
+              <Pause className="w-10 h-10 fill-current" />
             ) : (
-              <Play className="w-8 h-8 fill-current ml-1" />
+              <Play className="w-10 h-10 fill-current ml-2" />
             )}
           </button>
           
-          <button className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shadow-sm border border-transparent hover:border-border">
+          <button className="w-14 h-14 rounded-full bg-secondary/80 backdrop-blur flex items-center justify-center text-muted-foreground hover:text-foreground transition-all shadow-sm border border-transparent hover:border-border hover:scale-105 active:scale-95">
             <CheckCircle2 className="w-5 h-5" />
           </button>
         </div>
@@ -186,16 +193,16 @@ export default function Focus() {
       </div>
       
       {/* Session Stats (bottom) */}
-      <div className="absolute bottom-8 left-4 right-4 flex justify-center max-w-5xl mx-auto w-full">
-        <div className="flex items-center gap-8 bg-card/80 backdrop-blur-md px-6 py-3 rounded-2xl border shadow-sm text-sm">
+      <div className="absolute bottom-28 md:bottom-12 left-4 right-4 flex justify-center max-w-5xl mx-auto w-full px-4">
+        <div className="flex items-center justify-center gap-8 bg-card/80 backdrop-blur-xl px-8 py-4 rounded-3xl border shadow-sm w-full max-w-md">
           <div className="flex flex-col items-center">
-            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Sessions</span>
-            <span className="font-semibold text-lg">3<span className="text-muted-foreground text-sm font-normal">/4</span></span>
+            <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mb-1">Sessions</span>
+            <span className="font-display font-bold text-xl">3<span className="text-muted-foreground text-sm font-medium">/4</span></span>
           </div>
-          <div className="w-px h-8 bg-border" />
+          <div className="w-px h-10 bg-border" />
           <div className="flex flex-col items-center">
-            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Time Focused</span>
-            <span className="font-semibold text-lg">1h 15m</span>
+            <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mb-1">Time Focused</span>
+            <span className="font-display font-bold text-xl">1h 15m</span>
           </div>
         </div>
       </div>

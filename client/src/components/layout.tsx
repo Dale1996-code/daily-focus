@@ -1,8 +1,9 @@
-import { Link, useLocation } from "wouter";
-import { Home, Calendar, Timer, BookOpen, Plus, PenSquare, RefreshCw, Target, Library } from "lucide-react";
+import { Link, useLocation, useRoute } from "wouter";
+import { Home, Calendar, Timer, Plus, PenSquare, RefreshCw, Target, Library } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "@/lib/navigate";
 
 const navItems = [
   { href: "/", label: "Today", icon: Home },
@@ -14,6 +15,14 @@ const navItems = [
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [isFabOpen, setIsFabOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const fabActions = [
+    { label: "Schedule Focus", icon: Target, action: () => { setIsFabOpen(false); navigate("/focus"); } },
+    { label: "Add Template", icon: RefreshCw, action: () => { setIsFabOpen(false); navigate("/blueprints"); } },
+    { label: "Add Task", icon: Plus, action: () => { setIsFabOpen(false); navigate("/"); setTimeout(() => window.dispatchEvent(new CustomEvent("open-add-task")), 100); } },
+    { label: "Quick Note", icon: PenSquare, action: () => { setIsFabOpen(false); navigate("/"); setTimeout(() => window.dispatchEvent(new CustomEvent("focus-capture")), 100); } },
+  ];
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row pb-24 md:pb-0 font-sans">
@@ -45,7 +54,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* Desktop Quick Add Button */}
-        <button className="mt-auto bg-primary text-primary-foreground flex items-center justify-center gap-2 py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-sm text-sm">
+        <button
+          onClick={() => {
+            navigate("/");
+            setTimeout(() => window.dispatchEvent(new CustomEvent("open-add-task")), 100);
+          }}
+          className="mt-auto bg-primary text-primary-foreground flex items-center justify-center gap-2 py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-sm text-sm"
+        >
           <Plus className="w-4 h-4" />
           Quick Add
         </button>
@@ -76,21 +91,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {/* Action Menu */}
           {isFabOpen && (
             <div className="flex flex-col gap-4 items-end mb-4">
-              {[
-                { label: "Schedule Focus", icon: Target },
-                { label: "Add Routine", icon: RefreshCw },
-                { label: "Add Note", icon: PenSquare },
-                { label: "Add Task", icon: Plus },
-              ].map((action, i) => (
+              {fabActions.map((action, i) => (
                 <button 
                   key={i}
                   type="button"
+                  data-testid={`fab-action-${i}`}
                   className="flex items-center justify-end gap-3 w-full bg-transparent border-none p-0 cursor-pointer outline-none m-0"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log(`Clicked ${action.label}`);
-                    setIsFabOpen(false);
+                    action.action();
                   }}
                 >
                   <div className="bg-background px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg border text-foreground">
@@ -107,6 +117,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {/* Main Toggle Button */}
           <button 
             type="button"
+            data-testid="button-fab-toggle"
             className={cn(
               "h-14 w-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 outline-none cursor-pointer border-none m-0 p-0",
               isFabOpen ? "bg-secondary text-foreground rotate-45" : "bg-primary text-primary-foreground"

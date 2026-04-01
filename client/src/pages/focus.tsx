@@ -7,7 +7,9 @@ export default function Focus() {
   const [isActive, setIsActive] = useState(false);
   const [time, setTime] = useState(25 * 60); // 25 minutes in seconds
   const [mode, setMode] = useState<'focus' | 'shortBreak' | 'longBreak'>('focus');
-  const [taskName, setTaskName] = useState("Deep Work: Q3 Roadmap");
+  const [taskName, setTaskName] = useState("");
+  const [sessions, setSessions] = useState(0);
+  const [totalFocusTime, setTotalFocusTime] = useState(0); // seconds
   
   // Progress calculation
   const totalTime = mode === 'focus' ? 25 * 60 : mode === 'shortBreak' ? 5 * 60 : 15 * 60;
@@ -17,14 +19,17 @@ export default function Focus() {
     let interval: NodeJS.Timeout;
     if (isActive && time > 0) {
       interval = setInterval(() => {
-        setTime((time) => time - 1);
+        setTime((prev) => {
+          if (mode === 'focus') setTotalFocusTime(t => t + 1);
+          return prev - 1;
+        });
       }, 1000);
     } else if (time === 0) {
       setIsActive(false);
-      // Handle timer complete (play sound, show notification, etc)
+      if (mode === 'focus') setSessions(s => s + 1);
     }
     return () => clearInterval(interval);
-  }, [isActive, time]);
+  }, [isActive, time, mode]);
 
   const toggleTimer = () => setIsActive(!isActive);
   
@@ -58,8 +63,8 @@ export default function Focus() {
       )} />
 
       {/* Header controls */}
-      <div className="absolute top-8 left-4 right-4 flex justify-between items-center max-w-5xl mx-auto w-full px-4">
-        <div className="bg-card/80 backdrop-blur border rounded-full px-4 py-2 text-sm font-medium shadow-sm flex items-center gap-2">
+      <div className="absolute top-8 left-4 right-4 flex justify-between items-center max-w-5xl mx-auto w-full px-4 pointer-events-none">
+        <div className="bg-card/80 backdrop-blur border rounded-full px-4 py-2 text-sm font-medium shadow-sm flex items-center gap-2 pointer-events-auto">
           <span className={cn(
             "w-2 h-2 rounded-full",
             mode === 'focus' ? "bg-primary" : mode === 'shortBreak' ? "bg-green-500" : "bg-blue-500",
@@ -68,7 +73,7 @@ export default function Focus() {
           {mode === 'focus' ? "Focus Session" : mode === 'shortBreak' ? "Short Break" : "Long Break"}
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 pointer-events-auto">
           <button className="p-2.5 rounded-full bg-card/80 backdrop-blur border hover:bg-secondary text-muted-foreground transition-colors hidden sm:block">
             <Volume2 className="w-4 h-4" />
           </button>
@@ -114,7 +119,7 @@ export default function Focus() {
         {/* Timer Display */}
         <div className="relative flex items-center justify-center mb-16 scale-90 sm:scale-100">
           {/* Progress Ring */}
-          <svg className="absolute w-[340px] h-[340px] -rotate-90">
+          <svg className="absolute w-[340px] h-[340px] -rotate-90 pointer-events-none">
             <circle 
               cx="170" cy="170" r="160" 
               fill="none" 
@@ -185,7 +190,15 @@ export default function Focus() {
             )}
           </button>
           
-          <button className="w-14 h-14 rounded-full bg-secondary/80 backdrop-blur flex items-center justify-center text-muted-foreground hover:text-foreground transition-all shadow-sm border border-transparent hover:border-border hover:scale-105 active:scale-95">
+          <button
+            onClick={() => {
+              setIsActive(false);
+              setTime(totalTime);
+              setSessions(s => s + 1);
+            }}
+            title="Complete session"
+            className="w-14 h-14 rounded-full bg-secondary/80 backdrop-blur flex items-center justify-center text-muted-foreground hover:text-green-500 hover:bg-green-500/10 hover:border-green-500/30 transition-all shadow-sm border border-transparent hover:scale-105 active:scale-95"
+          >
             <CheckCircle2 className="w-5 h-5" />
           </button>
         </div>
@@ -193,16 +206,22 @@ export default function Focus() {
       </div>
       
       {/* Session Stats (bottom) */}
-      <div className="absolute bottom-28 md:bottom-12 left-4 right-4 flex justify-center max-w-5xl mx-auto w-full px-4">
-        <div className="flex items-center justify-center gap-8 bg-card/80 backdrop-blur-xl px-8 py-4 rounded-3xl border shadow-sm w-full max-w-md">
+      <div className="absolute bottom-28 md:bottom-12 left-4 right-4 flex justify-center max-w-5xl mx-auto w-full px-4 pointer-events-none">
+        <div className="flex items-center justify-center gap-8 bg-card/80 backdrop-blur-xl px-8 py-4 rounded-3xl border shadow-sm w-full max-w-md pointer-events-auto">
           <div className="flex flex-col items-center">
             <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mb-1">Sessions</span>
-            <span className="font-display font-bold text-xl">3<span className="text-muted-foreground text-sm font-medium">/4</span></span>
+            <span className="font-display font-bold text-xl" data-testid="stat-sessions">{sessions}<span className="text-muted-foreground text-sm font-medium">/4</span></span>
           </div>
           <div className="w-px h-10 bg-border" />
           <div className="flex flex-col items-center">
             <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mb-1">Time Focused</span>
-            <span className="font-display font-bold text-xl">1h 15m</span>
+            <span className="font-display font-bold text-xl" data-testid="stat-focus-time">
+              {totalFocusTime >= 3600
+                ? `${Math.floor(totalFocusTime / 3600)}h ${Math.floor((totalFocusTime % 3600) / 60)}m`
+                : totalFocusTime >= 60
+                  ? `${Math.floor(totalFocusTime / 60)}m`
+                  : `${totalFocusTime}s`}
+            </span>
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "wouter";
 import { Plus, Check, Circle, Flame, ArrowRight, Mic, Play, ChevronDown, ChevronRight, CalendarClock, MoreHorizontal, X, Zap, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -181,6 +181,19 @@ export default function Dashboard() {
   const [captureText, setCaptureText] = useState("");
   const [showAddTask, setShowAddTask] = useState(false);
   const captureTimer = useRef<NodeJS.Timeout | null>(null);
+  const captureRef = useRef<HTMLTextAreaElement>(null);
+
+  // Listen for events dispatched from the FAB/sidebar "Quick Add" button
+  useEffect(() => {
+    const handleOpenAddTask = () => setShowAddTask(true);
+    const handleFocusCapture = () => captureRef.current?.focus();
+    window.addEventListener("open-add-task", handleOpenAddTask);
+    window.addEventListener("focus-capture", handleFocusCapture);
+    return () => {
+      window.removeEventListener("open-add-task", handleOpenAddTask);
+      window.removeEventListener("focus-capture", handleFocusCapture);
+    };
+  }, []);
 
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks"],
@@ -406,6 +419,7 @@ export default function Dashboard() {
             <div className="bg-card border rounded-xl p-3 shadow-sm focus-within:ring-1 focus-within:ring-primary/30 transition-all focus-within:border-primary/30 group">
               <div className="flex items-start gap-2">
                 <textarea
+                  ref={captureRef}
                   data-testid="input-capture"
                   className="w-full bg-transparent border-none outline-none resize-none min-h-[60px] text-sm text-foreground placeholder:text-muted-foreground/60 focus:ring-0 leading-relaxed"
                   placeholder="What's on your mind?"

@@ -1,14 +1,14 @@
 import { Link, useLocation } from "wouter";
-import { Home, Calendar, Timer, BookOpen, Plus, PenSquare, RefreshCw, Target } from "lucide-react";
+import { Home, Calendar, Timer, BookOpen, Plus, PenSquare, RefreshCw, Target, Library } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const navItems = [
   { href: "/", label: "Today", icon: Home },
+  { href: "/blueprints", label: "Templates", icon: Library },
   { href: "/planner", label: "Planner", icon: Calendar },
   { href: "/focus", label: "Focus", icon: Timer },
-  { href: "/reflection", label: "Reflect", icon: BookOpen },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -18,28 +18,28 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row pb-24 md:pb-0 font-sans">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col w-64 border-r bg-card/50 px-4 py-8 h-screen sticky top-0">
+      <aside className="hidden md:flex flex-col w-64 border-r bg-sidebar px-4 py-8 h-screen sticky top-0">
         <div className="flex items-center gap-3 mb-10 px-2">
-          <div className="h-8 w-8 rounded-xl bg-primary flex items-center justify-center shadow-sm">
+          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shadow-sm">
             <span className="text-primary-foreground font-display font-bold text-lg">F</span>
           </div>
           <h1 className="font-display font-bold text-2xl tracking-tight">Flow</h1>
         </div>
         
-        <nav className="flex flex-col gap-2 flex-1">
+        <nav className="flex flex-col gap-1.5 flex-1">
           {navItems.map((item) => {
             const isActive = location === item.href;
             const Icon = item.icon;
             return (
               <Link key={item.href} href={item.href}>
                 <a className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200",
+                  "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200",
                   isActive 
-                    ? "bg-primary text-primary-foreground font-medium shadow-sm" 
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-sm border border-border/50" 
+                    : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
                 )}>
-                  <Icon className="w-5 h-5" />
-                  <span>{item.label}</span>
+                  <Icon className="w-4 h-4" />
+                  <span className="text-sm">{item.label}</span>
                 </a>
               </Link>
             );
@@ -47,8 +47,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* Desktop Quick Add Button */}
-        <button className="mt-auto bg-foreground text-background flex items-center justify-center gap-2 py-3 rounded-xl font-medium hover:bg-foreground/90 transition-colors shadow-sm">
-          <Plus className="w-5 h-5" />
+        <button className="mt-auto bg-primary text-primary-foreground flex items-center justify-center gap-2 py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-sm text-sm">
+          <Plus className="w-4 h-4" />
           Quick Add
         </button>
       </aside>

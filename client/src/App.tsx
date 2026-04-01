@@ -7,6 +7,7 @@ import { Layout } from "@/components/layout";
 import Dashboard from "@/pages/dashboard";
 import Planner from "@/pages/planner";
 import Focus from "@/pages/focus";
+import Blueprints from "@/pages/blueprints";
 import Reflection from "@/pages/reflection";
 import NotFound from "@/pages/not-found";
 
@@ -15,6 +16,7 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/" component={Dashboard}/>
+        <Route path="/blueprints" component={Blueprints}/>
         <Route path="/planner" component={Planner}/>
         <Route path="/focus" component={Focus}/>
         <Route path="/reflection" component={Reflection}/>

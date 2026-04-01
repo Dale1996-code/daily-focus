@@ -1,159 +1,202 @@
 import { useState, useEffect } from "react";
-import { Play, Pause, RotateCcw, Settings2, Coffee } from "lucide-react";
+import { Play, Pause, Square, RotateCcw, Volume2, Maximize2, Settings, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-type TimerMode = 'focus' | 'shortBreak' | 'longBreak';
-
-const MODES = {
-  focus: { label: 'Focus', minutes: 25, color: 'text-primary', bg: 'bg-primary' },
-  shortBreak: { label: 'Short Break', minutes: 5, color: 'text-accent', bg: 'bg-accent' },
-  longBreak: { label: 'Long Break', minutes: 15, color: 'text-blue-500', bg: 'bg-blue-500' },
-};
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function Focus() {
-  const [mode, setMode] = useState<TimerMode>('focus');
-  const [timeLeft, setTimeLeft] = useState(MODES.focus.minutes * 60);
-  const [isRunning, setIsRunning] = useState(false);
-  const [sessionsCompleted, setSessionsCompleted] = useState(0);
+  const [isActive, setIsActive] = useState(false);
+  const [time, setTime] = useState(25 * 60); // 25 minutes in seconds
+  const [mode, setMode] = useState<'focus' | 'shortBreak' | 'longBreak'>('focus');
+  const [taskName, setTaskName] = useState("Deep Work: Q3 Roadmap");
+  
+  // Progress calculation
+  const totalTime = mode === 'focus' ? 25 * 60 : mode === 'shortBreak' ? 5 * 60 : 15 * 60;
+  const progress = ((totalTime - time) / totalTime) * 100;
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    
-    if (isRunning && timeLeft > 0) {
+    if (isActive && time > 0) {
       interval = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
+        setTime((time) => time - 1);
       }, 1000);
-    } else if (timeLeft === 0 && isRunning) {
-      setIsRunning(false);
-      if (mode === 'focus') {
-        setSessionsCompleted(prev => prev + 1);
-        // Auto switch to break
-        const nextMode = (sessionsCompleted + 1) % 4 === 0 ? 'longBreak' : 'shortBreak';
-        setMode(nextMode);
-        setTimeLeft(MODES[nextMode].minutes * 60);
-      }
+    } else if (time === 0) {
+      setIsActive(false);
+      // Handle timer complete (play sound, show notification, etc)
     }
-
     return () => clearInterval(interval);
-  }, [isRunning, timeLeft, mode, sessionsCompleted]);
+  }, [isActive, time]);
 
-  const toggleTimer = () => setIsRunning(!isRunning);
-
+  const toggleTimer = () => setIsActive(!isActive);
+  
   const resetTimer = () => {
-    setIsRunning(false);
-    setTimeLeft(MODES[mode].minutes * 60);
-  };
-
-  const changeMode = (newMode: TimerMode) => {
-    setIsRunning(false);
-    setMode(newMode);
-    setTimeLeft(MODES[newMode].minutes * 60);
+    setIsActive(false);
+    setTime(totalTime);
   };
 
   const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const progress = 1 - (timeLeft / (MODES[mode].minutes * 60));
-  const activeColor = MODES[mode].color;
-  const activeBg = MODES[mode].bg;
+  const switchMode = (newMode: 'focus' | 'shortBreak' | 'longBreak') => {
+    setMode(newMode);
+    setIsActive(false);
+    if (newMode === 'focus') setTime(25 * 60);
+    else if (newMode === 'shortBreak') setTime(5 * 60);
+    else setTime(15 * 60);
+  };
 
   return (
-    <div className="p-4 md:p-8 pt-8 pb-24 md:pb-12 min-h-[calc(100vh-5rem)] md:min-h-screen flex flex-col items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="min-h-[80vh] flex flex-col items-center justify-center p-4 animate-in fade-in duration-500 max-w-3xl mx-auto relative">
       
-      {/* Mode Selector */}
-      <div className="flex bg-card border rounded-full p-1.5 mb-12 shadow-sm">
-        {(Object.keys(MODES) as TimerMode[]).map((m) => (
-          <button
-            key={m}
-            onClick={() => changeMode(m)}
-            className={cn(
-              "px-4 py-2 rounded-full text-sm font-medium transition-all duration-300",
-              mode === m 
-                ? "bg-secondary text-foreground shadow-sm" 
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {MODES[m].label}
-          </button>
-        ))}
-      </div>
+      {/* Ambient background glow based on mode */}
+      <div className={cn(
+        "absolute inset-0 -z-10 blur-[100px] opacity-20 transition-colors duration-1000",
+        mode === 'focus' ? "bg-primary/40" : mode === 'shortBreak' ? "bg-green-500/40" : "bg-blue-500/40"
+      )} />
 
-      {/* Timer Display */}
-      <div className="relative mb-12 group">
-        <svg width="320" height="320" viewBox="0 0 320 320" className="rotate-[-90deg]">
-          <circle 
-            cx="160" cy="160" r="150" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="8" 
-            className="text-secondary/50"
-          />
-          <circle 
-            cx="160" cy="160" r="150" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="8" 
-            strokeLinecap="round"
-            strokeDasharray={150 * 2 * Math.PI}
-            strokeDashoffset={(150 * 2 * Math.PI) * (1 - progress)}
-            className={cn("transition-all duration-1000 ease-linear", activeColor)}
-          />
-        </svg>
+      {/* Header controls */}
+      <div className="absolute top-8 left-4 right-4 flex justify-between items-center max-w-5xl mx-auto w-full px-4">
+        <div className="bg-card border rounded-full px-4 py-2 text-sm font-medium shadow-sm flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          Focus Session
+        </div>
         
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="font-display font-bold text-7xl md:text-8xl tracking-tighter mb-2">
-            {formatTime(timeLeft)}
-          </span>
-          <span className="text-muted-foreground font-medium flex items-center gap-2">
-            {mode === 'focus' ? 'Stay Focused' : 'Take a breath'} 
-            {mode !== 'focus' && <Coffee className="w-4 h-4" />}
-          </span>
+        <div className="flex gap-2">
+          <button className="p-2.5 rounded-full bg-card border hover:bg-secondary text-muted-foreground transition-colors">
+            <Volume2 className="w-4 h-4" />
+          </button>
+          <button className="p-2.5 rounded-full bg-card border hover:bg-secondary text-muted-foreground transition-colors">
+            <Settings className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="flex items-center gap-6">
-        <button 
-          onClick={resetTimer}
-          className="h-14 w-14 rounded-full border bg-card hover:bg-secondary text-muted-foreground flex items-center justify-center transition-all hover:scale-105 active:scale-95"
-        >
-          <RotateCcw className="w-5 h-5" />
-        </button>
+      <div className="w-full max-w-md flex flex-col items-center">
         
-        <button 
-          onClick={toggleTimer}
-          className={cn(
-            "h-20 w-20 rounded-full flex items-center justify-center text-white shadow-lg transition-all hover:scale-105 active:scale-95",
-            activeBg,
-            isRunning && "animate-pulse"
-          )}
-        >
-          {isRunning ? <Pause className="w-8 h-8 fill-current" /> : <Play className="w-8 h-8 fill-current ml-1" />}
-        </button>
-        
-        <button className="h-14 w-14 rounded-full border bg-card hover:bg-secondary text-muted-foreground flex items-center justify-center transition-all hover:scale-105 active:scale-95">
-          <Settings2 className="w-5 h-5" />
-        </button>
-      </div>
+        {/* Mode Selector */}
+        <div className="flex p-1 bg-secondary/50 rounded-xl mb-12 border shadow-inner">
+          <button 
+            onClick={() => switchMode('focus')}
+            className={cn(
+              "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+              mode === 'focus' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Focus
+          </button>
+          <button 
+            onClick={() => switchMode('shortBreak')}
+            className={cn(
+              "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+              mode === 'shortBreak' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Short Break
+          </button>
+          <button 
+            onClick={() => switchMode('longBreak')}
+            className={cn(
+              "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+              mode === 'longBreak' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Long Break
+          </button>
+        </div>
 
-      {/* Session Tracker */}
-      <div className="mt-16 text-center">
-        <p className="text-sm font-medium text-muted-foreground mb-3">Sessions Today</p>
-        <div className="flex gap-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div 
-              key={i} 
-              className={cn(
-                "h-2 w-8 rounded-full transition-all duration-500",
-                i < (sessionsCompleted % 4) ? activeBg : 
-                (i === sessionsCompleted % 4 && isRunning && mode === 'focus') ? `${activeBg} animate-pulse` : 
-                "bg-secondary border"
-              )} 
+        {/* Timer Display */}
+        <div className="relative flex items-center justify-center mb-12">
+          {/* Progress Ring */}
+          <svg className="absolute w-[320px] h-[320px] -rotate-90">
+            <circle 
+              cx="160" cy="160" r="150" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="4" 
+              className="text-secondary/50" 
             />
-          ))}
+            <motion.circle 
+              cx="160" cy="160" r="150" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="6" 
+              strokeLinecap="round"
+              className={cn(
+                "transition-all duration-1000",
+                mode === 'focus' ? "text-primary" : mode === 'shortBreak' ? "text-green-500" : "text-blue-500"
+              )}
+              strokeDasharray={`${150 * 2 * Math.PI}`}
+              strokeDashoffset={`${(150 * 2 * Math.PI) * (1 - progress / 100)}`}
+              initial={{ strokeDashoffset: 150 * 2 * Math.PI }}
+              animate={{ strokeDashoffset: (150 * 2 * Math.PI) * (1 - progress / 100) }}
+            />
+          </svg>
+
+          {/* Time Text */}
+          <div className="flex flex-col items-center z-10 text-center mt-4">
+            <span className="font-display text-8xl font-bold tracking-tighter text-foreground" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {formatTime(time)}
+            </span>
+            <input 
+              type="text" 
+              value={taskName}
+              onChange={(e) => setTaskName(e.target.value)}
+              className="mt-4 bg-transparent border-none text-center text-muted-foreground hover:text-foreground outline-none focus:ring-2 focus:ring-primary/20 rounded-md px-4 py-1 text-sm font-medium transition-colors w-full max-w-[200px]"
+              placeholder="What are you working on?"
+            />
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="flex items-center justify-center gap-6">
+          <button 
+            onClick={resetTimer}
+            className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shadow-sm border border-transparent hover:border-border"
+          >
+            <RotateCcw className="w-5 h-5" />
+          </button>
+          
+          <button 
+            onClick={toggleTimer}
+            className={cn(
+              "w-20 h-20 rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-105 active:scale-95",
+              isActive 
+                ? "bg-secondary text-foreground border" 
+                : mode === 'focus' 
+                  ? "bg-primary text-primary-foreground" 
+                  : mode === 'shortBreak'
+                    ? "bg-green-500 text-white"
+                    : "bg-blue-500 text-white"
+            )}
+          >
+            {isActive ? (
+              <Pause className="w-8 h-8 fill-current" />
+            ) : (
+              <Play className="w-8 h-8 fill-current ml-1" />
+            )}
+          </button>
+          
+          <button className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shadow-sm border border-transparent hover:border-border">
+            <CheckCircle2 className="w-5 h-5" />
+          </button>
+        </div>
+
+      </div>
+      
+      {/* Session Stats (bottom) */}
+      <div className="absolute bottom-8 left-4 right-4 flex justify-center max-w-5xl mx-auto w-full">
+        <div className="flex items-center gap-8 bg-card/80 backdrop-blur-md px-6 py-3 rounded-2xl border shadow-sm text-sm">
+          <div className="flex flex-col items-center">
+            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Sessions</span>
+            <span className="font-semibold text-lg">3<span className="text-muted-foreground text-sm font-normal">/4</span></span>
+          </div>
+          <div className="w-px h-8 bg-border" />
+          <div className="flex flex-col items-center">
+            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Time Focused</span>
+            <span className="font-semibold text-lg">1h 15m</span>
+          </div>
         </div>
       </div>
 

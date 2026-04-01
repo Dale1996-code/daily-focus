@@ -31,16 +31,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
             const isActive = location === item.href;
             const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href}>
-                <a className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200",
-                  isActive 
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-sm border border-border/50" 
-                    : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-                )}>
-                  <Icon className="w-4 h-4" />
-                  <span className="text-sm">{item.label}</span>
-                </a>
+              <Link key={item.href} href={item.href} className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200",
+                isActive 
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-sm border border-border/50" 
+                  : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+              )}>
+                <Icon className="w-4 h-4" />
+                <span className="text-sm">{item.label}</span>
               </Link>
             );
           })}
@@ -131,20 +129,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
             const isActive = location === item.href;
             const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href}>
-                <a className={cn(
-                  "flex flex-col items-center gap-1 p-2 rounded-2xl transition-all min-w-[4.5rem] relative",
-                  isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                )}>
-                  {isActive && (
-                    <motion.div 
-                      layoutId="bottom-nav-indicator"
-                      className="absolute inset-0 bg-primary/10 rounded-2xl z-0"
-                    />
-                  )}
-                  <Icon className={cn("w-5 h-5 relative z-10", isActive ? "stroke-[2.5px]" : "stroke-[2px]")} />
-                  <span className="text-[10px] font-semibold relative z-10">{item.label}</span>
-                </a>
+              <Link key={item.href} href={item.href} className={cn(
+                "flex flex-col items-center gap-1 p-2 rounded-2xl transition-all min-w-[4.5rem] relative",
+                isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+              )}>
+                {isActive && (
+                  <motion.div 
+                    layoutId="bottom-nav-indicator"
+                    className="absolute inset-0 bg-primary/10 rounded-2xl z-0"
+                  />
+                )}
+                <Icon className={cn("w-5 h-5 relative z-10", isActive ? "stroke-[2.5px]" : "stroke-[2px]")} />
+                <span className="text-[10px] font-semibold relative z-10">{item.label}</span>
               </Link>
             );
           })}

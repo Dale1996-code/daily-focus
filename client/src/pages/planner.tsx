@@ -34,8 +34,9 @@ function DraggableEvent({ event, onResize }: { event: any, onResize: (id: string
         // Snap to grid (15 min increments roughly)
         // In a real app we'd calculate exact time slot based on y offset
       }}
+      whileDrag={{ scale: 1.02, zIndex: 50, opacity: 0.9 }}
       className={cn(
-        "absolute left-0 right-0 rounded-xl p-3 border shadow-sm flex flex-col gap-1 overflow-hidden transition-colors hover:ring-2 hover:ring-primary/20 z-10 cursor-grab active:cursor-grabbing",
+        "absolute left-0 right-0 rounded-xl p-3 border shadow-sm flex flex-col gap-1 overflow-hidden hover:ring-2 hover:ring-primary/20 z-10 cursor-grab active:cursor-grabbing will-change-transform transform-gpu",
         event.type === 'meeting' && "bg-blue-500/10 border-blue-500/20 text-blue-700 dark:text-blue-400",
         event.type === 'focus' && "bg-primary/10 border-primary/20 text-primary",
         event.type === 'review' && "bg-orange-500/10 border-orange-500/20 text-orange-700 dark:text-orange-400",
@@ -45,6 +46,7 @@ function DraggableEvent({ event, onResize }: { event: any, onResize: (id: string
       style={{
         top: `${(event.top / (times.length - 1)) * 100}%`,
         height: `${(event.height / (times.length - 1)) * 100}%`,
+        touchAction: "none"
       }}
     >
       <div className="flex justify-between items-start">
@@ -95,7 +97,7 @@ export default function Planner() {
         </div>
         
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 bg-secondary/50 backdrop-blur rounded-xl p-1 border shadow-inner">
+          <div className="flex items-center gap-1 bg-secondary/50 rounded-xl p-1 border shadow-inner">
             <button className="p-2 hover:bg-background rounded-lg text-muted-foreground hover:text-foreground transition-all shadow-sm">
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -143,7 +145,7 @@ export default function Planner() {
         <div className="lg:col-span-3 bg-card border rounded-3xl overflow-hidden shadow-sm flex flex-col h-full relative group">
           
           {/* Timeline Header */}
-          <div className="p-4 px-6 border-b bg-secondary/30 backdrop-blur flex justify-between items-center z-20 shrink-0">
+          <div className="p-4 px-6 border-b bg-secondary/30 flex justify-between items-center z-20 shrink-0">
             <h3 className="font-display font-bold text-lg">{weekDays[selectedDay]}, Oct {23 + selectedDay}</h3>
             <div className="flex items-center gap-3">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest bg-background px-3 py-1.5 rounded-lg border shadow-sm">
@@ -221,7 +223,9 @@ export default function Planner() {
                 <Reorder.Item 
                   key={task.id} 
                   value={task}
-                  className="bg-background border rounded-2xl p-3 shadow-sm cursor-grab active:cursor-grabbing hover:border-primary/30 transition-colors group relative"
+                  whileDrag={{ scale: 1.02, zIndex: 50, opacity: 0.9 }}
+                  className="bg-background border rounded-2xl p-3 shadow-sm cursor-grab active:cursor-grabbing hover:border-primary/30 group relative will-change-transform transform-gpu"
+                  style={{ touchAction: "none" }}
                 >
                   <div className="flex gap-3">
                     <div className="mt-1 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors shrink-0">

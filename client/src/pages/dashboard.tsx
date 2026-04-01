@@ -164,12 +164,11 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 md:p-8 pt-6 pb-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl mx-auto">
-      
       {/* Premium Header & Score */}
       <header className="mb-8 flex items-start justify-between">
         <div>
           <h2 className="text-muted-foreground text-sm mb-1 tracking-tight">Tuesday, October 24</h2>
-          <h1 className="text-2xl md:text-3xl font-display font-semibold tracking-tight text-foreground">Good morning, Alex.</h1>
+          <h1 className="text-2xl md:text-3xl font-display font-semibold tracking-tight text-foreground">Good morning, Dale.</h1>
         </div>
         
         {/* Today Score Widget */}
@@ -196,7 +195,6 @@ export default function Dashboard() {
           </div>
         </div>
       </header>
-
       <div className="grid md:grid-cols-3 gap-6 lg:gap-10">
         
         {/* MAIN COLUMN */}

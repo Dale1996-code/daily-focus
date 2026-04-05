@@ -1,0 +1,12 @@
+Reduce the visual weight of completed tasks. Move them into a collapsed section labeled something like “Completed today (X)” or redesign completed task cards to be much shorter, lighter, and less prominent than active tasks.
+	2.	Rework the Quick Notes area into a smaller, more useful quick-capture component. Make it feel tappable, change the tone from passive note-taking to fast entry, consider renaming it to “Quick Capture,” add a microphone icon for voice input, and include either a save button or a clear auto-save indicator.
+	3.	Improve the Routines section so it feels more interactive and visually informative. Add progress rings or mini streak bars, make completion states clearer, reduce the visual emphasis of streak numbers, and support clearer status labels such as done, skipped, or pending for today.
+	4.	Move the “Up Next” section higher on the page so it appears above Quick Notes or directly below Today’s Priorities. Prioritize immediate action items higher in the layout than note-taking features.
+	5.	Make the floating plus button more obvious and useful. Style it more clearly as a floating action button, optionally label it for new users, and have it open a quick-add menu with actions like Add Task, Add Routine, Add Note, and Schedule Focus.
+	6.	Refine the bottom navigation to feel more polished and premium. Make the active tab more visually distinct, tighten icon and label spacing, and ensure each tab has a clearly defined purpose with no overlap:
+	•	Today = dashboard
+	•	Planner = upcoming tasks/calendar
+	•	Focus = timer/deep work
+	•	Reflect = review, journal, or stats
+	7.	Improve accessibility and readability throughout the interface. Increase contrast where needed, especially for light gray text on white backgrounds, pale status tags, and thin task-completion outlines. Make sure important UI elements remain easy to read and recognize.
+	8.	Add higher-value productivity interactions where possible. Include swipe actions for tasks such as complete, reschedule, or delete; long-press for quick edit; a “Today score” based on tasks and routines; smart overdue suggestions like “Reschedule” or “Do now”; a focus mode that launches directly from a task card; and a nightly daily recap feature.

@@ -2,6 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import rateLimit from "express-rate-limit";
+import { configureSession } from "./session";
 
 const app = express();
 const httpServer = createServer(app);
@@ -21,6 +23,16 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+configureSession(app);
+
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use("/api", apiLimiter);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -72,7 +84,12 @@ app.use((req, res, next) => {
       return next(err);
     }
 
-    return res.status(status).json({ message });
+    return res.status(status).json({
+      error: {
+        code: status >= 500 ? "INTERNAL_ERROR" : "REQUEST_ERROR",
+        message,
+      },
+    });
   });
 
   // importantly only setup vite in development and after

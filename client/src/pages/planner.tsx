@@ -1,264 +1,412 @@
-import { useState, useRef, useEffect } from "react";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Users, Plus, LayoutGrid, List, GripVertical, CheckCircle2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { motion, Reorder, useDragControls } from "framer-motion";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { addDays, addMinutes, format, isSameDay, startOfWeek } from "date-fns";
+import { apiRequest } from "@/lib/api";
+import type { PlannerEvent, PlannerEventType, Task } from "@shared/schema";
 
-const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const times = Array.from({ length: 13 }, (_, i) => i + 8); // 8 AM to 8 PM
-
-// Complex interactive state structure
-const initialEvents = [
-  { id: "1", title: "Product Sync", time: "10:00", duration: 60, type: "meeting", attendees: 4, day: 2, top: 2, height: 1 },
-  { id: "2", title: "Deep Work: Q3 Roadmap", time: "13:00", duration: 120, type: "focus", day: 2, top: 5, height: 2 },
-  { id: "3", title: "Design Review", time: "15:30", duration: 45, type: "review", attendees: 2, day: 2, top: 7.5, height: 0.75 },
+const weekDayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const eventTypeOptions: PlannerEventType[] = [
+  "focus",
+  "meeting",
+  "review",
+  "social",
+  "admin",
 ];
 
-const initialBacklog = [
-  { id: "b1", title: "Write weekly update", duration: 30, type: "admin" },
-  { id: "b2", title: "Review Q4 budget", duration: 60, type: "focus" },
-  { id: "b3", title: "Clear inbox", duration: 45, type: "admin" },
-];
+function eventTypeClass(type: PlannerEventType) {
+  if (type === "meeting") return "bg-blue-500/10 border-blue-500/30 text-blue-700";
+  if (type === "focus") return "bg-primary/10 border-primary/30 text-primary";
+  if (type === "review") return "bg-orange-500/10 border-orange-500/30 text-orange-700";
+  if (type === "social") return "bg-green-500/10 border-green-500/30 text-green-700";
+  return "bg-secondary border-border text-foreground";
+}
 
-function DraggableEvent({ event, onResize }: { event: any, onResize: (id: string, newHeight: number) => void }) {
-  const controls = useDragControls();
-  const elementRef = useRef<HTMLDivElement>(null);
+interface CreateEventDraft {
+  title: string;
+  eventType: PlannerEventType;
+  startTime: string;
+  durationMinutes: number;
+  attendees: number;
+  notes: string;
+}
 
-  return (
-    <motion.div
-      ref={elementRef}
-      drag="y"
-      dragControls={controls}
-      dragMomentum={false}
-      dragElastic={0}
-      onDragEnd={(e, info) => {
-        // Snap to grid (15 min increments roughly)
-        // In a real app we'd calculate exact time slot based on y offset
-      }}
-      whileDrag={{ scale: 1.02, zIndex: 50, opacity: 0.9 }}
-      className={cn(
-        "absolute left-0 right-0 rounded-xl p-3 border shadow-sm flex flex-col gap-1 overflow-hidden hover:ring-2 hover:ring-primary/20 z-10 cursor-grab active:cursor-grabbing will-change-transform transform-gpu",
-        event.type === 'meeting' && "bg-blue-500/10 border-blue-500/20 text-blue-700 dark:text-blue-400",
-        event.type === 'focus' && "bg-primary/10 border-primary/20 text-primary",
-        event.type === 'review' && "bg-orange-500/10 border-orange-500/20 text-orange-700 dark:text-orange-400",
-        event.type === 'social' && "bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-400",
-        event.type === 'admin' && "bg-secondary/80 border-border text-foreground"
-      )}
-      style={{
-        top: `${(event.top / (times.length - 1)) * 100}%`,
-        height: `${(event.height / (times.length - 1)) * 100}%`,
-        touchAction: "none"
-      }}
-    >
-      <div className="flex justify-between items-start">
-        <h4 className="font-bold text-sm leading-tight select-none">{event.title}</h4>
-        <span className="text-xs font-semibold opacity-80 select-none">{event.time}</span>
-      </div>
-      
-      {event.duration >= 45 && (
-        <div className="flex items-center gap-3 mt-auto text-xs font-semibold opacity-80 select-none">
-          <div className="flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5" />
-            <span>{event.duration}m</span>
-          </div>
-          {event.attendees && (
-            <div className="flex items-center gap-1">
-              <Users className="w-3.5 h-3.5" />
-              <span>{event.attendees}</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Resize Handle */}
-      <div 
-        className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-background/20"
-        onPointerDown={(e) => e.stopPropagation()} // Prevent dragging the whole card when resizing
-      >
-        <div className="w-8 h-1 rounded-full bg-current opacity-50" />
-      </div>
-    </motion.div>
-  );
+function defaultDraft(): CreateEventDraft {
+  return {
+    title: "",
+    eventType: "focus",
+    startTime: "09:00",
+    durationMinutes: 60,
+    attendees: 0,
+    notes: "",
+  };
 }
 
 export default function Planner() {
-  const [view, setView] = useState<'calendar' | 'list'>('calendar');
-  const [selectedDay, setSelectedDay] = useState(2); // Tuesday
-  const [events, setEvents] = useState(initialEvents);
-  const [backlog, setBacklog] = useState(initialBacklog);
+  const qc = useQueryClient();
+  const [weekStart, setWeekStart] = useState(() =>
+    startOfWeek(new Date(), { weekStartsOn: 1 }),
+  );
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const [showCreate, setShowCreate] = useState(false);
+  const [draft, setDraft] = useState<CreateEventDraft>(defaultDraft);
+
+  const weekDates = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
+    [weekStart],
+  );
+  const selectedDate = weekDates[selectedDayIndex];
+  const weekEnd = addDays(weekStart, 6);
+
+  const plannerQuery = useQuery<PlannerEvent[]>({
+    queryKey: [
+      "/api/planner-events",
+      weekStart.toISOString(),
+      weekEnd.toISOString(),
+    ],
+    queryFn: () =>
+      apiRequest<PlannerEvent[]>(
+        "GET",
+        `/api/planner-events?start=${encodeURIComponent(
+          weekStart.toISOString(),
+        )}&end=${encodeURIComponent(weekEnd.toISOString())}`,
+      ),
+  });
+
+  const tasksQuery = useQuery<Task[]>({
+    queryKey: ["/api/tasks"],
+    queryFn: () => apiRequest<Task[]>("GET", "/api/tasks"),
+  });
+
+  const createPlannerEvent = useMutation({
+    mutationFn: async (payload: {
+      title: string;
+      eventType: PlannerEventType;
+      startsAt: string;
+      endsAt: string;
+      attendees: number;
+      notes?: string;
+    }) => apiRequest("POST", "/api/planner-events", payload),
+    onSuccess: () =>
+      qc.invalidateQueries({
+        queryKey: ["/api/planner-events"],
+        exact: false,
+      }),
+  });
+
+  const deletePlannerEvent = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/planner-events/${id}`),
+    onSuccess: () =>
+      qc.invalidateQueries({
+        queryKey: ["/api/planner-events"],
+        exact: false,
+      }),
+  });
+
+  const dayEvents = useMemo(
+    () =>
+      (plannerQuery.data ?? [])
+        .filter((event) => isSameDay(new Date(event.startsAt), selectedDate))
+        .sort(
+          (a, b) =>
+            new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+        ),
+    [plannerQuery.data, selectedDate],
+  );
+
+  const backlogTasks = useMemo(
+    () => (tasksQuery.data ?? []).filter((task) => !task.completed).slice(0, 6),
+    [tasksQuery.data],
+  );
+
+  const buildEventPayload = () => {
+    const [hours, minutes] = draft.startTime.split(":").map(Number);
+    const startsAt = new Date(selectedDate);
+    startsAt.setHours(hours, minutes, 0, 0);
+    const endsAt = addMinutes(startsAt, draft.durationMinutes);
+
+    return {
+      title: draft.title.trim(),
+      eventType: draft.eventType,
+      startsAt: startsAt.toISOString(),
+      endsAt: endsAt.toISOString(),
+      attendees: draft.attendees,
+      notes: draft.notes.trim() || undefined,
+    };
+  };
+
+  const handleCreateEvent = async () => {
+    if (!draft.title.trim()) return;
+    await createPlannerEvent.mutateAsync(buildEventPayload());
+    setShowCreate(false);
+    setDraft(defaultDraft());
+  };
 
   return (
-    <div className="p-4 md:p-8 pt-6 pb-24 md:pb-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-6xl mx-auto h-[calc(100vh-64px)] flex flex-col">
-      
-      {/* Premium Header */}
-      <header className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4 shrink-0">
+    <div className="p-4 md:p-8 pt-6 pb-24 md:pb-8 max-w-6xl mx-auto">
+      <header className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="text-muted-foreground text-sm font-semibold mb-1 tracking-widest uppercase">October 2023</h2>
-          <h1 className="text-3xl md:text-4xl font-display font-bold tracking-tight text-foreground">Weekly Planner</h1>
+          <h2 className="text-muted-foreground text-sm font-semibold mb-1 tracking-widest uppercase">
+            {format(weekStart, "MMMM yyyy")}
+          </h2>
+          <h1 className="text-3xl md:text-4xl font-display font-bold tracking-tight text-foreground">
+            Weekly Planner
+          </h1>
         </div>
-        
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 bg-secondary/50 rounded-xl p-1 border shadow-inner">
-            <button className="p-2 hover:bg-background rounded-lg text-muted-foreground hover:text-foreground transition-all shadow-sm">
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="text-sm font-bold px-3">Week 42</span>
-            <button className="p-2 hover:bg-background rounded-lg text-muted-foreground hover:text-foreground transition-all shadow-sm">
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            className="p-2 rounded-lg bg-secondary hover:bg-secondary/80"
+            onClick={() => setWeekStart((current) => addDays(current, -7))}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-sm font-semibold min-w-[140px] text-center">
+            {format(weekStart, "MMM d")} - {format(weekEnd, "MMM d")}
+          </span>
+          <button
+            className="p-2 rounded-lg bg-secondary hover:bg-secondary/80"
+            onClick={() => setWeekStart((current) => addDays(current, 7))}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </header>
 
-      {/* Week Day Selector */}
-      <div className="flex gap-2 overflow-x-auto pb-4 mb-2 hide-scrollbar shrink-0">
-        {weekDays.map((day, i) => {
-          const date = 23 + i;
-          const isToday = i === 2; // Mock Tuesday as today
-          const isSelected = selectedDay === i;
-          
+      <div className="flex gap-2 overflow-x-auto pb-3 mb-4">
+        {weekDates.map((day, index) => {
+          const isSelected = index === selectedDayIndex;
           return (
             <button
-              key={day}
-              onClick={() => setSelectedDay(i)}
+              key={day.toISOString()}
+              onClick={() => setSelectedDayIndex(index)}
               className={cn(
-                "flex flex-col items-center justify-center min-w-[4.5rem] h-[4.5rem] rounded-2xl transition-all border",
-                isSelected 
-                  ? "bg-foreground text-background border-foreground shadow-md scale-105" 
-                  : isToday
-                    ? "bg-primary/5 border-primary/30 text-primary hover:bg-primary/10"
-                    : "bg-card border-border hover:border-border/80 text-muted-foreground hover:text-foreground"
+                "min-w-[74px] px-3 py-2 rounded-xl border transition-all",
+                isSelected
+                  ? "bg-foreground text-background border-foreground"
+                  : "bg-card border-border hover:border-primary/40",
               )}
             >
-              <span className={cn("text-[10px] font-bold uppercase tracking-wider mb-0.5", isSelected ? "opacity-80" : "")}>{day}</span>
-              <span className="text-xl font-display font-bold leading-none">{date}</span>
-              {isToday && !isSelected && (
-                <div className="w-1 h-1 rounded-full bg-primary mt-1.5" />
-              )}
+              <p className="text-[10px] uppercase tracking-wider font-semibold">
+                {weekDayLabels[index]}
+              </p>
+              <p className="text-lg font-display font-bold">{format(day, "d")}</p>
             </button>
           );
         })}
       </div>
 
-      <div className="grid lg:grid-cols-4 gap-6 flex-1 min-h-0">
-        
-        {/* Timeline View (Takes up more space now) */}
-        <div className="lg:col-span-3 bg-card border rounded-3xl overflow-hidden shadow-sm flex flex-col h-full relative group">
-          
-          {/* Timeline Header */}
-          <div className="p-4 px-6 border-b bg-secondary/30 flex justify-between items-center z-20 shrink-0">
-            <h3 className="font-display font-bold text-lg">{weekDays[selectedDay]}, Oct {23 + selectedDay}</h3>
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest bg-background px-3 py-1.5 rounded-lg border shadow-sm">
-                {events.filter(e => e.day === selectedDay).length} blocks
-              </span>
+      <div className="grid lg:grid-cols-4 gap-6">
+        <section className="lg:col-span-3 bg-card border rounded-3xl p-5 md:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-display font-bold text-xl">
+                {format(selectedDate, "EEEE, MMM d")}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {dayEvents.length} scheduled block
+                {dayEvents.length === 1 ? "" : "s"}
+              </p>
             </div>
+            <button
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary/90"
+              onClick={() => setShowCreate(true)}
+            >
+              <Plus className="w-4 h-4" />
+              Add Block
+            </button>
           </div>
-          
-          {/* Scrollable Timeline */}
-          <div className="flex-1 overflow-y-auto hide-scrollbar relative">
-            <div className="min-h-[800px] relative p-4 px-6">
-              
-              {/* Grid Lines */}
-              <div className="absolute inset-y-4 left-20 right-6 flex flex-col justify-between z-0 pointer-events-none">
-                {times.map((time, i) => (
-                  <div key={time} className="w-full h-px bg-border/40 relative flex-1">
-                    <span className="absolute -left-14 -top-2.5 text-xs font-bold text-muted-foreground">
-                      {time}:00
-                    </span>
-                    {/* Half-hour marker */}
-                    {i !== times.length - 1 && (
-                      <div className="absolute top-1/2 left-0 right-0 h-px bg-border/20 border-dashed" />
-                    )}
-                  </div>
-                ))}
-              </div>
 
-              {/* Events Container */}
-              <div className="absolute inset-y-4 left-24 right-6">
-                {events.filter(e => e.day === selectedDay).map(event => (
-                  <DraggableEvent 
-                    key={event.id} 
-                    event={event} 
-                    onResize={(id, h) => {
-                      setEvents(events.map(e => e.id === id ? { ...e, height: h } : e));
-                    }} 
-                  />
-                ))}
-                
-                {/* Current time indicator (mocked) */}
-                {selectedDay === 2 && (
-                  <div 
-                    className="absolute left-[-16px] right-0 h-[2px] bg-primary z-20 flex items-center shadow-[0_0_8px_rgba(var(--primary),0.5)]"
-                    style={{ top: '35%' }}
+          {plannerQuery.isLoading ? (
+            <div className="text-sm text-muted-foreground py-8 text-center">
+              Loading planner blocks...
+            </div>
+          ) : dayEvents.length === 0 ? (
+            <div className="border border-dashed rounded-2xl p-8 text-center text-muted-foreground">
+              <CalendarIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="font-medium">No blocks yet for this day.</p>
+              <p className="text-sm mt-1">Add a focus block to lock in your time.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {dayEvents.map((event) => (
+                <article
+                  key={event.id}
+                  className={cn(
+                    "rounded-2xl border p-4 flex items-start justify-between gap-3",
+                    eventTypeClass(event.eventType),
+                  )}
+                >
+                  <div>
+                    <h3 className="font-semibold">{event.title}</h3>
+                    <p className="text-xs mt-1 flex items-center gap-1 opacity-80">
+                      <Clock className="w-3 h-3" />
+                      {format(new Date(event.startsAt), "h:mm a")} -{" "}
+                      {format(new Date(event.endsAt), "h:mm a")}
+                    </p>
+                    {event.notes ? (
+                      <p className="text-sm mt-2 opacity-90">{event.notes}</p>
+                    ) : null}
+                  </div>
+                  <button
+                    className="p-2 rounded-md hover:bg-black/5"
+                    onClick={() => deletePlannerEvent.mutate(event.id)}
+                    title="Delete block"
                   >
-                    <div className="w-2.5 h-2.5 rounded-full bg-primary absolute left-[-4px]" />
-                  </div>
-                )}
-              </div>
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </article>
+              ))}
             </div>
-          </div>
-        </div>
+          )}
+        </section>
 
-        {/* Backlog / Drag Source */}
-        <div className="hidden lg:flex flex-col gap-6 h-full">
-          <div className="bg-card border rounded-3xl p-5 shadow-sm flex flex-col flex-1 min-h-0">
-            <div className="flex items-center justify-between mb-4 shrink-0">
-              <h3 className="font-display font-bold text-lg">Task Backlog</h3>
-              <button className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-colors">
-                <Plus className="w-4 h-4" />
+        <aside className="bg-card border rounded-3xl p-5">
+          <h3 className="font-display font-bold text-lg mb-1">Task Backlog</h3>
+          <p className="text-xs text-muted-foreground uppercase tracking-widest mb-4">
+            Click to schedule
+          </p>
+
+          {backlogTasks.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No open tasks. You are caught up.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {backlogTasks.map((task) => (
+                <button
+                  key={task.id}
+                  className="w-full text-left border rounded-xl p-3 hover:border-primary/40 transition-colors"
+                  onClick={() => {
+                    setDraft((current) => ({ ...current, title: task.title }));
+                    setShowCreate(true);
+                  }}
+                >
+                  <p className="font-medium text-sm">{task.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{task.category}</p>
+                </button>
+              ))}
+            </div>
+          )}
+        </aside>
+      </div>
+
+      {showCreate && (
+        <div
+          className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm p-4 flex items-center justify-center"
+          onClick={() => setShowCreate(false)}
+        >
+          <div
+            className="bg-card border rounded-2xl p-5 w-full max-w-lg"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="font-display font-semibold text-lg mb-4">Create Planner Block</h2>
+
+            <div className="space-y-3">
+              <input
+                className="w-full border rounded-lg px-3 py-2 bg-background"
+                placeholder="Block title"
+                value={draft.title}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, title: event.target.value }))
+                }
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  className="border rounded-lg px-3 py-2 bg-background"
+                  value={draft.eventType}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      eventType: event.target.value as PlannerEventType,
+                    }))
+                  }
+                >
+                  {eventTypeOptions.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  type="time"
+                  className="border rounded-lg px-3 py-2 bg-background"
+                  value={draft.startTime}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, startTime: event.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="number"
+                  className="border rounded-lg px-3 py-2 bg-background"
+                  min={15}
+                  step={15}
+                  value={draft.durationMinutes}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      durationMinutes: Math.max(15, Number(event.target.value) || 15),
+                    }))
+                  }
+                  placeholder="Duration (minutes)"
+                />
+                <input
+                  type="number"
+                  className="border rounded-lg px-3 py-2 bg-background"
+                  min={0}
+                  max={1000}
+                  value={draft.attendees}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      attendees: Math.max(0, Number(event.target.value) || 0),
+                    }))
+                  }
+                  placeholder="Attendees"
+                />
+              </div>
+
+              <textarea
+                className="w-full border rounded-lg px-3 py-2 bg-background min-h-[80px]"
+                placeholder="Notes (optional)"
+                value={draft.notes}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, notes: event.target.value }))
+                }
+              />
+            </div>
+
+            <div className="mt-5 flex gap-2 justify-end">
+              <button
+                className="px-4 py-2 rounded-lg border"
+                onClick={() => setShowCreate(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground disabled:opacity-60"
+                onClick={handleCreateEvent}
+                disabled={createPlannerEvent.isPending || !draft.title.trim()}
+              >
+                {createPlannerEvent.isPending ? "Saving..." : "Save block"}
               </button>
             </div>
-            
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-4 shrink-0">
-              Drag into timeline
-            </p>
-
-            <Reorder.Group 
-              axis="y" 
-              values={backlog} 
-              onReorder={setBacklog}
-              className="space-y-3 overflow-y-auto hide-scrollbar flex-1 pb-4"
-            >
-              {backlog.map((task) => (
-                <Reorder.Item 
-                  key={task.id} 
-                  value={task}
-                  whileDrag={{ scale: 1.02, zIndex: 50, opacity: 0.9 }}
-                  className="bg-background border rounded-2xl p-3 shadow-sm cursor-grab active:cursor-grabbing hover:border-primary/30 group relative will-change-transform transform-gpu"
-                  style={{ touchAction: "none" }}
-                >
-                  <div className="flex gap-3">
-                    <div className="mt-1 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors shrink-0">
-                      <GripVertical className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-semibold mb-1 pr-2">{task.title}</h4>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-muted-foreground bg-secondary px-2 py-0.5 rounded-md flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> {task.duration}m
-                        </span>
-                        <span className="text-[10px] font-bold text-primary/70 uppercase tracking-wider">
-                          {task.type}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </Reorder.Item>
-              ))}
-            </Reorder.Group>
-            
-            <div className="mt-auto pt-4 border-t border-dashed shrink-0">
-               <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3 flex items-center gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  <div className="flex flex-col">
-                    <span className="text-xs font-bold text-green-700">Daily Goal Met</span>
-                    <span className="text-[10px] font-medium text-green-600/80">4 focus sessions planned</span>
-                  </div>
-               </div>
-            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

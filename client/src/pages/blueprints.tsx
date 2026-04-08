@@ -1,19 +1,21 @@
 import { useState } from "react";
-import { Copy, Plus, Check, ChevronRight, Briefcase, Users, MessageSquare, Loader2 } from "lucide-react";
+import {
+  Plus,
+  Check,
+  ChevronRight,
+  Briefcase,
+  Users,
+  MessageSquare,
+  Loader2,
+  Save,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-
-async function apiRequest(method: string, path: string, body?: unknown) {
-  const res = await fetch(path, {
-    method,
-    headers: body ? { "Content-Type": "application/json" } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!res.ok) throw new Error(await res.text());
-  if (res.status === 204) return null;
-  return res.json();
-}
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/api";
+import { useQuickActions } from "@/context/quick-actions";
+import { useNavigate } from "@/lib/navigate";
+import type { Blueprint } from "@shared/schema";
 
 const blueprints = [
   {
@@ -68,7 +70,19 @@ const blueprints = [
 export default function Blueprints() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [addedId, setAddedId] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [customTitle, setCustomTitle] = useState("");
+  const [customDescription, setCustomDescription] = useState("");
+  const [customCategory, setCustomCategory] = useState("General");
+  const [customItems, setCustomItems] = useState("");
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const { triggerAddTask } = useQuickActions();
+
+  const { data: customBlueprints = [] } = useQuery<Blueprint[]>({
+    queryKey: ["/api/blueprints"],
+    queryFn: () => apiRequest<Blueprint[]>("GET", "/api/blueprints"),
+  });
 
   const addTasksMutation = useMutation({
     mutationFn: async ({ tasks, category }: { tasks: { text: string }[], category: string }) => {
@@ -79,12 +93,43 @@ export default function Blueprints() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/tasks"] }),
   });
 
+  const createBlueprintMutation = useMutation({
+    mutationFn: (payload: {
+      title: string;
+      description: string;
+      category: string;
+      items: string[];
+    }) => apiRequest("POST", "/api/blueprints", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/blueprints"] }),
+  });
+
   const handleUseBlueprint = async (e: React.MouseEvent, bp: typeof blueprints[0]) => {
     e.stopPropagation();
     if (addedId === bp.id) return;
     setAddedId(bp.id);
     await addTasksMutation.mutateAsync({ tasks: bp.tasks, category: bp.category });
     setTimeout(() => setAddedId(null), 3000);
+  };
+
+  const handleCreateCustomBlueprint = async () => {
+    const items = customItems
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    if (!customTitle.trim() || items.length === 0) return;
+
+    await createBlueprintMutation.mutateAsync({
+      title: customTitle.trim(),
+      description: customDescription.trim(),
+      category: customCategory.trim() || "General",
+      items,
+    });
+
+    setCustomTitle("");
+    setCustomDescription("");
+    setCustomCategory("General");
+    setCustomItems("");
+    setShowCreateModal(false);
   };
 
   return (
@@ -191,21 +236,129 @@ export default function Blueprints() {
           );
         })}
       </div>
+
+      {customBlueprints.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-sm uppercase tracking-wider text-muted-foreground font-semibold mb-3">
+            Saved Blueprints
+          </h2>
+          <div className="grid gap-3">
+            {customBlueprints.map((bp) => (
+              <div
+                key={bp.id}
+                className="border rounded-2xl p-4 bg-card flex items-start justify-between gap-3"
+              >
+                <div>
+                  <h3 className="font-semibold text-base">{bp.title}</h3>
+                  {bp.description ? (
+                    <p className="text-sm text-muted-foreground mt-1">{bp.description}</p>
+                  ) : null}
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {bp.items.length} item{bp.items.length === 1 ? "" : "s"} • {bp.category}
+                  </p>
+                </div>
+                <button
+                  className="text-xs font-semibold px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  onClick={() =>
+                    addTasksMutation.mutate({
+                      tasks: bp.items.map((text) => ({ text })),
+                      category: bp.category,
+                    })
+                  }
+                >
+                  Use
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       
       <button
         data-testid="button-create-blueprint"
         className="mt-8 w-full border-2 border-dashed border-border text-muted-foreground font-semibold rounded-3xl p-6 flex flex-col items-center justify-center gap-2 hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-all group"
-        onClick={() => {
-          window.dispatchEvent(new CustomEvent("open-add-task"));
-          window.location.href = "/";
-        }}
+        onClick={() => setShowCreateModal(true)}
       >
         <div className="h-12 w-12 rounded-full bg-secondary group-hover:bg-primary/10 flex items-center justify-center mb-2 transition-colors">
           <Plus className="w-6 h-6" />
         </div>
         Create Custom Blueprint
-        <p className="text-xs font-normal text-muted-foreground mt-1">Add your own tasks to Today</p>
+        <p className="text-xs font-normal text-muted-foreground mt-1">Save your own repeatable checklist</p>
       </button>
+
+      {showCreateModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm p-4 flex items-center justify-center"
+          onClick={() => setShowCreateModal(false)}
+        >
+          <div
+            className="bg-card border rounded-2xl p-5 w-full max-w-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="font-display font-semibold text-lg mb-4">
+              Save Custom Blueprint
+            </h2>
+            <div className="space-y-3">
+              <input
+                className="w-full border rounded-lg px-3 py-2 bg-background"
+                placeholder="Blueprint title"
+                value={customTitle}
+                onChange={(event) => setCustomTitle(event.target.value)}
+              />
+              <input
+                className="w-full border rounded-lg px-3 py-2 bg-background"
+                placeholder="Category (for example: Work, Health)"
+                value={customCategory}
+                onChange={(event) => setCustomCategory(event.target.value)}
+              />
+              <textarea
+                className="w-full border rounded-lg px-3 py-2 bg-background min-h-[70px]"
+                placeholder="Description (optional)"
+                value={customDescription}
+                onChange={(event) => setCustomDescription(event.target.value)}
+              />
+              <textarea
+                className="w-full border rounded-lg px-3 py-2 bg-background min-h-[140px]"
+                placeholder={"One item per line\nExample:\nOpen store checklist\nReview freight notes\nPrep handoff summary"}
+                value={customItems}
+                onChange={(event) => setCustomItems(event.target.value)}
+              />
+            </div>
+            <div className="mt-5 flex justify-between items-center">
+              <button
+                className="text-sm text-primary hover:underline"
+                onClick={() => {
+                  setShowCreateModal(false);
+                  navigate("/");
+                  setTimeout(triggerAddTask, 100);
+                }}
+              >
+                Or add just one task now
+              </button>
+              <div className="flex gap-2">
+                <button
+                  className="px-4 py-2 rounded-lg border"
+                  onClick={() => setShowCreateModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-4 py-2 rounded-lg bg-primary text-primary-foreground disabled:opacity-60 flex items-center gap-2"
+                  disabled={
+                    createBlueprintMutation.isPending ||
+                    !customTitle.trim() ||
+                    customItems.trim().length === 0
+                  }
+                  onClick={handleCreateCustomBlueprint}
+                >
+                  <Save className="w-4 h-4" />
+                  {createBlueprintMutation.isPending ? "Saving..." : "Save Blueprint"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

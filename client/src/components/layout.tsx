@@ -1,27 +1,131 @@
-import { Link, useLocation, useRoute } from "wouter";
-import { Home, Calendar, Timer, Plus, PenSquare, RefreshCw, Target, Library } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import {
+  Home,
+  Calendar,
+  Timer,
+  Plus,
+  PenSquare,
+  RefreshCw,
+  Target,
+  Library,
+  BookOpen,
+  LogOut,
+  KeyRound,
+  Loader2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useNavigate } from "@/lib/navigate";
+import { useQuickActions } from "@/context/quick-actions";
+import { useAuthSession } from "@/lib/auth";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest, ApiError } from "@/lib/api";
 
 const navItems = [
   { href: "/", label: "Today", icon: Home },
   { href: "/blueprints", label: "Templates", icon: Library },
   { href: "/planner", label: "Planner", icon: Calendar },
   { href: "/focus", label: "Focus", icon: Timer },
+  { href: "/reflection", label: "Reflect", icon: BookOpen },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [location] = useLocation();
   const [isFabOpen, setIsFabOpen] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [changePasswordError, setChangePasswordError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { triggerAddTask, triggerFocusCapture } = useQuickActions();
+  const session = useAuthSession();
+
+  const logoutMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/auth/logout"),
+    onSuccess: () => {
+      queryClient.clear();
+      queryClient.setQueryData(["/api/auth/session"], {
+        authenticated: false,
+        needsSetup: false,
+      });
+      navigate("/");
+    },
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: (payload: { currentPassword: string; newPassword: string }) =>
+      apiRequest("POST", "/api/auth/change-password", payload),
+    onSuccess: () => {
+      setChangePasswordError(null);
+      setCurrentPassword("");
+      setNewPassword("");
+      setShowChangePassword(false);
+    },
+    onError: (error) => {
+      if (error instanceof ApiError) {
+        setChangePasswordError(error.message);
+      } else {
+        setChangePasswordError("Could not change password. Please try again.");
+      }
+    },
+  });
 
   const fabActions = [
-    { label: "Schedule Focus", icon: Target, action: () => { setIsFabOpen(false); navigate("/focus"); } },
-    { label: "Add Template", icon: RefreshCw, action: () => { setIsFabOpen(false); navigate("/blueprints"); } },
-    { label: "Add Task", icon: Plus, action: () => { setIsFabOpen(false); navigate("/"); setTimeout(() => window.dispatchEvent(new CustomEvent("open-add-task")), 100); } },
-    { label: "Quick Note", icon: PenSquare, action: () => { setIsFabOpen(false); navigate("/"); setTimeout(() => window.dispatchEvent(new CustomEvent("focus-capture")), 100); } },
+    {
+      label: "Schedule Focus",
+      icon: Target,
+      action: () => {
+        setIsFabOpen(false);
+        navigate("/focus");
+      },
+    },
+    {
+      label: "Add Template",
+      icon: RefreshCw,
+      action: () => {
+        setIsFabOpen(false);
+        navigate("/blueprints");
+      },
+    },
+    {
+      label: "Add Task",
+      icon: Plus,
+      action: () => {
+        setIsFabOpen(false);
+        navigate("/");
+        setTimeout(triggerAddTask, 100);
+      },
+    },
+    {
+      label: "Quick Note",
+      icon: PenSquare,
+      action: () => {
+        setIsFabOpen(false);
+        navigate("/");
+        setTimeout(triggerFocusCapture, 100);
+      },
+    },
+    {
+      label: "Change Password",
+      icon: KeyRound,
+      action: () => {
+        setIsFabOpen(false);
+        setChangePasswordError(null);
+        setCurrentPassword("");
+        setNewPassword("");
+        setShowChangePassword(true);
+      },
+    },
+    {
+      label: "Sign Out",
+      icon: LogOut,
+      action: () => {
+        setIsFabOpen(false);
+        logoutMutation.mutate();
+      },
+    },
   ];
 
   return (
@@ -34,6 +138,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
           <h1 className="font-display font-bold text-2xl tracking-tight">Flow</h1>
         </div>
+
+        {session.data?.user ? (
+          <div className="mb-6 px-2 py-2 rounded-lg bg-secondary/40 border text-xs">
+            <p className="text-muted-foreground uppercase tracking-wider mb-1">Signed in as</p>
+            <p className="font-semibold truncate">{session.data.user.username}</p>
+          </div>
+        ) : null}
         
         <nav className="flex flex-col gap-1.5 flex-1">
           {navItems.map((item) => {
@@ -57,12 +168,30 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <button
           onClick={() => {
             navigate("/");
-            setTimeout(() => window.dispatchEvent(new CustomEvent("open-add-task")), 100);
+            setTimeout(triggerAddTask, 100);
           }}
           className="mt-auto bg-primary text-primary-foreground flex items-center justify-center gap-2 py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-sm text-sm"
         >
           <Plus className="w-4 h-4" />
           Quick Add
+        </button>
+        <button
+          onClick={() => {
+            setChangePasswordError(null);
+            setCurrentPassword("");
+            setNewPassword("");
+            setShowChangePassword(true);
+          }}
+          className="mt-2 text-sm border rounded-lg py-2.5 hover:bg-secondary/50 transition-colors"
+        >
+          Change Password
+        </button>
+        <button
+          onClick={() => logoutMutation.mutate()}
+          className="mt-2 text-sm border rounded-lg py-2.5 hover:bg-secondary/50 transition-colors disabled:opacity-50"
+          disabled={logoutMutation.isPending}
+        >
+          {logoutMutation.isPending ? "Signing out..." : "Sign Out"}
         </button>
       </aside>
 
@@ -157,6 +286,84 @@ export function Layout({ children }: { children: React.ReactNode }) {
           })}
         </div>
       </nav>
+
+      {showChangePassword && (
+        <div
+          className="fixed inset-0 z-[10000] bg-black/30 backdrop-blur-sm p-4 flex items-center justify-center"
+          onClick={() => {
+            setShowChangePassword(false);
+            setChangePasswordError(null);
+          }}
+        >
+          <div
+            className="bg-card border rounded-2xl p-5 w-full max-w-md"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="font-display text-xl font-semibold mb-2">Change Password</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Enter your current password and choose a new one.
+            </p>
+
+            <div className="space-y-3">
+              <input
+                type="password"
+                className="w-full border rounded-lg px-3 py-2 bg-background"
+                placeholder="Current password"
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                autoComplete="current-password"
+              />
+              <input
+                type="password"
+                className="w-full border rounded-lg px-3 py-2 bg-background"
+                placeholder="New password (8+ characters)"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                autoComplete="new-password"
+              />
+            </div>
+
+            {changePasswordError ? (
+              <p className="text-sm text-destructive mt-3">{changePasswordError}</p>
+            ) : null}
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                className="px-4 py-2 rounded-lg border"
+                onClick={() => {
+                  setShowChangePassword(false);
+                  setChangePasswordError(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground disabled:opacity-60 flex items-center gap-2"
+                disabled={
+                  changePasswordMutation.isPending ||
+                  currentPassword.length < 8 ||
+                  newPassword.length < 8
+                }
+                onClick={() =>
+                  changePasswordMutation.mutate({
+                    currentPassword,
+                    newPassword,
+                  })
+                }
+              >
+                {changePasswordMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Update Password"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,23 +1,25 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import { Plus, Check, Circle, Flame, ArrowRight, Mic, Play, ChevronDown, ChevronRight, CalendarClock, MoreHorizontal, X, Zap, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Task, Habit, CaptureNote } from "@shared/schema";
+import { apiRequest } from "@/lib/api";
+import { useQuickActions } from "@/context/quick-actions";
+import { useNavigate } from "@/lib/navigate";
 
-async function apiRequest(method: string, path: string, body?: unknown) {
-  const res = await fetch(path, {
-    method,
-    headers: body ? { "Content-Type": "application/json" } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!res.ok) throw new Error(await res.text());
-  if (res.status === 204) return null;
-  return res.json();
-}
-
-function TaskCard({ task, onToggle, onDelete }: { task: Task, onToggle: (id: string) => void, onDelete: (id: string) => void }) {
+function TaskCard({
+  task,
+  onToggle,
+  onDelete,
+  onStartFocus,
+}: {
+  task: Task;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+  onStartFocus: () => void;
+}) {
   const [isSwiping, setIsSwiping] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
@@ -86,7 +88,10 @@ function TaskCard({ task, onToggle, onDelete }: { task: Task, onToggle: (id: str
             </p>
             {!task.completed && (
               <button
-                onClick={(e) => { e.stopPropagation(); window.location.href = '/focus'; }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStartFocus();
+                }}
                 className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary p-1 rounded-md flex-shrink-0"
                 title="Start Focus"
               >
@@ -177,32 +182,34 @@ function AddTaskModal({ onClose, onAdd }: { onClose: () => void, onAdd: (task: {
 
 export default function Dashboard() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const { addTaskSignal, focusCaptureSignal } = useQuickActions();
   const [showCompleted, setShowCompleted] = useState(false);
   const [captureText, setCaptureText] = useState("");
   const [showAddTask, setShowAddTask] = useState(false);
   const captureTimer = useRef<NodeJS.Timeout | null>(null);
   const captureRef = useRef<HTMLTextAreaElement>(null);
 
-  // Listen for events dispatched from the FAB/sidebar "Quick Add" button
   useEffect(() => {
-    const handleOpenAddTask = () => setShowAddTask(true);
-    const handleFocusCapture = () => captureRef.current?.focus();
-    window.addEventListener("open-add-task", handleOpenAddTask);
-    window.addEventListener("focus-capture", handleFocusCapture);
-    return () => {
-      window.removeEventListener("open-add-task", handleOpenAddTask);
-      window.removeEventListener("focus-capture", handleFocusCapture);
-    };
-  }, []);
+    if (addTaskSignal > 0) {
+      setShowAddTask(true);
+    }
+  }, [addTaskSignal]);
+
+  useEffect(() => {
+    if (focusCaptureSignal > 0) {
+      captureRef.current?.focus();
+    }
+  }, [focusCaptureSignal]);
 
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks"],
-    queryFn: () => apiRequest("GET", "/api/tasks"),
+    queryFn: () => apiRequest<Task[]>("GET", "/api/tasks"),
   });
 
   const { data: habits = [], isLoading: habitsLoading } = useQuery<Habit[]>({
     queryKey: ["/api/habits"],
-    queryFn: () => apiRequest("GET", "/api/habits"),
+    queryFn: () => apiRequest<Habit[]>("GET", "/api/habits"),
   });
 
   const createTask = useMutation({
@@ -369,7 +376,13 @@ export default function Dashboard() {
                   </div>
                 ) : (
                   activeTasks.map(task => (
-                    <TaskCard key={task.id} task={task} onToggle={toggleTask} onDelete={removeTask} />
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onToggle={toggleTask}
+                      onDelete={removeTask}
+                      onStartFocus={() => navigate("/focus")}
+                    />
                   ))
                 )}
               </div>

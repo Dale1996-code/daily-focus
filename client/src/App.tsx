@@ -10,6 +10,8 @@ import Focus from "@/pages/focus";
 import Blueprints from "@/pages/blueprints";
 import Reflection from "@/pages/reflection";
 import NotFound from "@/pages/not-found";
+import { QuickActionsProvider } from "@/context/quick-actions";
+import { AuthGate } from "@/components/auth-gate";
 
 function Router() {
   return (
@@ -29,10 +31,14 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
+      <QuickActionsProvider>
+        <TooltipProvider>
+          <Toaster />
+          <AuthGate>
+            <Router />
+          </AuthGate>
+        </TooltipProvider>
+      </QuickActionsProvider>
     </QueryClientProvider>
   );
 }

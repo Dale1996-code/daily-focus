@@ -33,7 +33,7 @@ Preferred communication style: Simple, everyday language.
 - `/focus` → Pomodoro timer
 - `/reflection` → Guided journaling
 
-**State Management:** TanStack Query (React Query v5) handles all server state. The `queryClient` is configured with `staleTime: Infinity` and no automatic refetching — data is only refreshed on explicit mutations.
+**State Management:** TanStack Query (React Query v5) handles server state with a shared API client, short-lived cache freshness (`staleTime: 30s`), and standard refetch behavior to keep data reliable.
 
 **UI Component Library:** shadcn/ui (New York style) built on Radix UI primitives. Components live in `client/src/components/ui/`. Tailwind CSS v4 (via `@tailwindcss/vite`) handles all styling with CSS custom properties for theming.
 
@@ -53,7 +53,8 @@ Preferred communication style: Simple, everyday language.
 
 **Structure:**
 - `server/index.ts` — Express app setup, logging middleware, HTTP server creation
-- `server/routes.ts` — All REST API route handlers (tasks, habits, capture notes)
+- `server/routes.ts` — Route registration entrypoint
+- `server/routes/*.ts` — Feature route modules (tasks, habits, capture, planner, focus, reflections, blueprints, health)
 - `server/storage.ts` — Data access layer implementing the `IStorage` interface via `DbStorage`
 - `server/vite.ts` — Vite dev server integration (middleware mode with HMR)
 - `server/static.ts` — Static file serving for production builds
@@ -63,8 +64,8 @@ Preferred communication style: Simple, everyday language.
 - `PATCH/DELETE /api/tasks/:id` — Update and delete tasks
 - `GET/POST /api/habits` — List and create habits
 - `PATCH/DELETE /api/habits/:id` — Update and delete habits
-- `GET/POST /api/capture-notes` — List and create quick capture notes
-- `DELETE /api/capture-notes/:id` — Delete capture notes
+- `GET/POST /api/capture` — List and create quick capture notes
+- `DELETE /api/capture/:id` — Delete capture notes
 
 **Validation:** Zod schemas (derived from Drizzle table definitions via `drizzle-zod`) validate all incoming request bodies before database operations.
 

@@ -1,186 +1,242 @@
-import { useState, useEffect } from "react";
-import { Play, Pause, Square, RotateCcw, Volume2, Maximize2, Settings, CheckCircle2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  Settings,
+  CheckCircle2,
+  Clock3,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { format, isToday } from "date-fns";
+import { apiRequest } from "@/lib/api";
+import type { FocusMode, FocusSession } from "@shared/schema";
+
+const modeDurations: Record<FocusMode, number> = {
+  focus: 25 * 60,
+  shortBreak: 5 * 60,
+  longBreak: 15 * 60,
+};
+
+function formatTime(seconds: number) {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+}
+
+function formatSeconds(seconds: number) {
+  if (seconds >= 3600) {
+    return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+  }
+  if (seconds >= 60) {
+    return `${Math.floor(seconds / 60)}m`;
+  }
+  return `${seconds}s`;
+}
 
 export default function Focus() {
+  const qc = useQueryClient();
+  const [mode, setMode] = useState<FocusMode>("focus");
   const [isActive, setIsActive] = useState(false);
-  const [time, setTime] = useState(25 * 60); // 25 minutes in seconds
-  const [mode, setMode] = useState<'focus' | 'shortBreak' | 'longBreak'>('focus');
+  const [time, setTime] = useState(modeDurations.focus);
   const [taskName, setTaskName] = useState("");
-  const [sessions, setSessions] = useState(0);
-  const [totalFocusTime, setTotalFocusTime] = useState(0); // seconds
-  
-  // Progress calculation
-  const totalTime = mode === 'focus' ? 25 * 60 : mode === 'shortBreak' ? 5 * 60 : 15 * 60;
+
+  const focusSessionsQuery = useQuery<FocusSession[]>({
+    queryKey: ["/api/focus-sessions"],
+    queryFn: () => apiRequest<FocusSession[]>("GET", "/api/focus-sessions?limit=40"),
+  });
+
+  const logSessionMutation = useMutation({
+    mutationFn: (payload: {
+      taskTitle: string | null;
+      mode: FocusMode;
+      durationSeconds: number;
+      completed: boolean;
+      startedAt: string;
+      endedAt: string;
+    }) => apiRequest("POST", "/api/focus-sessions", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/focus-sessions"] }),
+  });
+
+  const totalTime = modeDurations[mode];
   const progress = ((totalTime - time) / totalTime) * 100;
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isActive && time > 0) {
-      interval = setInterval(() => {
-        setTime((prev) => {
-          if (mode === 'focus') setTotalFocusTime(t => t + 1);
-          return prev - 1;
-        });
-      }, 1000);
-    } else if (time === 0) {
-      setIsActive(false);
-      if (mode === 'focus') setSessions(s => s + 1);
-    }
-    return () => clearInterval(interval);
-  }, [isActive, time, mode]);
+    if (!isActive || time <= 0) return;
 
-  const toggleTimer = () => setIsActive(!isActive);
-  
-  const resetTimer = () => {
+    const interval = setInterval(() => {
+      setTime((previous) => previous - 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isActive, time]);
+
+  useEffect(() => {
+    if (time !== 0) return;
+    completeCurrentSession(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [time]);
+
+  const completeCurrentSession = async (completed: boolean) => {
+    if (mode !== "focus") {
+      setIsActive(false);
+      setTime(totalTime);
+      return;
+    }
+
+    const durationSeconds = totalTime - time;
     setIsActive(false);
     setTime(totalTime);
+
+    if (durationSeconds <= 0) return;
+
+    await logSessionMutation.mutateAsync({
+      taskTitle: taskName.trim() || null,
+      mode,
+      durationSeconds,
+      completed,
+      startedAt: new Date(Date.now() - durationSeconds * 1000).toISOString(),
+      endedAt: new Date().toISOString(),
+    });
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const switchMode = (newMode: 'focus' | 'shortBreak' | 'longBreak') => {
+  const switchMode = (newMode: FocusMode) => {
     setMode(newMode);
     setIsActive(false);
-    if (newMode === 'focus') setTime(25 * 60);
-    else if (newMode === 'shortBreak') setTime(5 * 60);
-    else setTime(15 * 60);
+    setTime(modeDurations[newMode]);
   };
 
-  return (
-    <div className="min-h-[100dvh] md:min-h-[80vh] flex flex-col items-center justify-center p-4 animate-in fade-in duration-500 max-w-3xl mx-auto relative overflow-hidden">
-      
-      {/* Ambient background glow based on mode */}
-      <div className={cn(
-        "absolute inset-0 -z-10 blur-[120px] opacity-30 transition-colors duration-1000",
-        mode === 'focus' ? "bg-primary/40" : mode === 'shortBreak' ? "bg-green-500/40" : "bg-blue-500/40",
-        isActive && "animate-pulse"
-      )} />
+  const sessions = focusSessionsQuery.data ?? [];
+  const todaySessions = sessions.filter(
+    (session) => session.mode === "focus" && session.completed && isToday(new Date(session.createdAt)),
+  );
+  const focusedTodaySeconds = todaySessions.reduce(
+    (sum, session) => sum + session.durationSeconds,
+    0,
+  );
 
-      {/* Header controls */}
-      <div className="absolute top-8 left-4 right-4 flex justify-between items-center max-w-5xl mx-auto w-full px-4 pointer-events-none">
-        <div className="bg-card/80 backdrop-blur border rounded-full px-4 py-2 text-sm font-medium shadow-sm flex items-center gap-2 pointer-events-auto">
-          <span className={cn(
-            "w-2 h-2 rounded-full",
-            mode === 'focus' ? "bg-primary" : mode === 'shortBreak' ? "bg-green-500" : "bg-blue-500",
-            isActive && "animate-pulse"
-          )} />
-          {mode === 'focus' ? "Focus Session" : mode === 'shortBreak' ? "Short Break" : "Long Break"}
-        </div>
-        
-        <div className="flex gap-2 pointer-events-auto">
-          <button className="p-2.5 rounded-full bg-card/80 backdrop-blur border hover:bg-secondary text-muted-foreground transition-colors hidden sm:block">
-            <Volume2 className="w-4 h-4" />
-          </button>
-          <button className="p-2.5 rounded-full bg-card/80 backdrop-blur border hover:bg-secondary text-muted-foreground transition-colors">
-            <Settings className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+  return (
+    <div className="min-h-[100dvh] md:min-h-[80vh] flex flex-col items-center justify-center p-4 max-w-4xl mx-auto relative overflow-hidden">
+      <div
+        className={cn(
+          "absolute inset-0 -z-10 blur-[120px] opacity-30 transition-colors duration-1000",
+          mode === "focus"
+            ? "bg-primary/40"
+            : mode === "shortBreak"
+              ? "bg-green-500/40"
+              : "bg-blue-500/40",
+          isActive && "animate-pulse",
+        )}
+      />
 
       <div className="w-full max-w-md flex flex-col items-center mt-8">
-        
-        {/* Mode Selector */}
-        <div className="flex p-1.5 bg-secondary/50 backdrop-blur rounded-2xl mb-12 border shadow-inner w-full max-w-[320px]">
-          <button 
-            onClick={() => switchMode('focus')}
+        <div className="flex p-1.5 bg-secondary/50 rounded-2xl mb-12 border shadow-inner w-full max-w-[320px]">
+          <button
+            onClick={() => switchMode("focus")}
             className={cn(
               "flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all",
-              mode === 'focus' ? "bg-background text-foreground shadow-sm scale-100" : "text-muted-foreground hover:text-foreground scale-95 hover:scale-100"
+              mode === "focus"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             Focus
           </button>
-          <button 
-            onClick={() => switchMode('shortBreak')}
+          <button
+            onClick={() => switchMode("shortBreak")}
             className={cn(
               "flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all",
-              mode === 'shortBreak' ? "bg-background text-foreground shadow-sm scale-100" : "text-muted-foreground hover:text-foreground scale-95 hover:scale-100"
+              mode === "shortBreak"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             Short Break
           </button>
-          <button 
-            onClick={() => switchMode('longBreak')}
+          <button
+            onClick={() => switchMode("longBreak")}
             className={cn(
               "flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all",
-              mode === 'longBreak' ? "bg-background text-foreground shadow-sm scale-100" : "text-muted-foreground hover:text-foreground scale-95 hover:scale-100"
+              mode === "longBreak"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             Long Break
           </button>
         </div>
 
-        {/* Timer Display */}
-        <div className="relative flex items-center justify-center mb-16 scale-90 sm:scale-100">
-          {/* Progress Ring */}
+        <div className="relative flex items-center justify-center mb-14">
           <svg className="absolute w-[340px] h-[340px] -rotate-90 pointer-events-none">
-            <circle 
-              cx="170" cy="170" r="160" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="4" 
-              className="text-secondary/60" 
+            <circle
+              cx="170"
+              cy="170"
+              r="160"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="4"
+              className="text-secondary/60"
             />
-            <motion.circle 
-              cx="170" cy="170" r="160" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="8" 
+            <circle
+              cx="170"
+              cy="170"
+              r="160"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="8"
               strokeLinecap="round"
               className={cn(
-                "transition-all duration-1000",
-                mode === 'focus' ? "text-primary drop-shadow-[0_0_8px_rgba(var(--primary),0.5)]" : 
-                mode === 'shortBreak' ? "text-green-500 drop-shadow-[0_0_8px_rgba(34,197,94,0.5)]" : 
-                "text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                mode === "focus"
+                  ? "text-primary"
+                  : mode === "shortBreak"
+                    ? "text-green-500"
+                    : "text-blue-500",
               )}
               strokeDasharray={`${160 * 2 * Math.PI}`}
               strokeDashoffset={`${(160 * 2 * Math.PI) * (1 - progress / 100)}`}
-              initial={{ strokeDashoffset: 160 * 2 * Math.PI }}
-              animate={{ strokeDashoffset: (160 * 2 * Math.PI) * (1 - progress / 100) }}
             />
           </svg>
 
-          {/* Time Text */}
           <div className="flex flex-col items-center z-10 text-center mt-4">
-            <span className="font-display text-[6rem] sm:text-8xl font-bold tracking-tighter text-foreground leading-none" style={{ fontVariantNumeric: 'tabular-nums' }}>
+            <span
+              className="font-display text-[6rem] sm:text-8xl font-bold tracking-tighter text-foreground leading-none"
+              style={{ fontVariantNumeric: "tabular-nums" }}
+            >
               {formatTime(time)}
             </span>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={taskName}
-              onChange={(e) => setTaskName(e.target.value)}
-              className="mt-6 bg-secondary/30 backdrop-blur border-none text-center text-muted-foreground hover:text-foreground outline-none focus:ring-2 focus:ring-primary/50 rounded-xl px-4 py-2 text-sm font-medium transition-colors w-full max-w-[240px]"
+              onChange={(event) => setTaskName(event.target.value)}
+              className="mt-6 bg-secondary/30 border-none text-center text-muted-foreground hover:text-foreground outline-none focus:ring-2 focus:ring-primary/50 rounded-xl px-4 py-2 text-sm font-medium transition-colors w-full max-w-[240px]"
               placeholder="What are you working on?"
             />
           </div>
         </div>
 
-        {/* Controls */}
         <div className="flex items-center justify-center gap-6 sm:gap-8">
-          <button 
-            onClick={resetTimer}
-            className="w-14 h-14 rounded-full bg-secondary/80 backdrop-blur flex items-center justify-center text-muted-foreground hover:text-foreground transition-all shadow-sm border border-transparent hover:border-border hover:scale-105 active:scale-95"
+          <button
+            onClick={() => {
+              setIsActive(false);
+              setTime(totalTime);
+            }}
+            className="w-14 h-14 rounded-full bg-secondary/80 flex items-center justify-center text-muted-foreground hover:text-foreground transition-all shadow-sm"
           >
             <RotateCcw className="w-5 h-5" />
           </button>
-          
-          <button 
-            onClick={toggleTimer}
+
+          <button
+            onClick={() => setIsActive((active) => !active)}
             className={cn(
-              "w-24 h-24 rounded-full flex items-center justify-center shadow-xl transition-all hover:scale-105 active:scale-95",
-              isActive 
-                ? "bg-secondary text-foreground border-2 border-border" 
-                : mode === 'focus' 
-                  ? "bg-primary text-primary-foreground" 
-                  : mode === 'shortBreak'
+              "w-24 h-24 rounded-full flex items-center justify-center shadow-xl transition-all hover:scale-105",
+              isActive
+                ? "bg-secondary text-foreground border-2 border-border"
+                : mode === "focus"
+                  ? "bg-primary text-primary-foreground"
+                  : mode === "shortBreak"
                     ? "bg-green-500 text-white"
-                    : "bg-blue-500 text-white"
+                    : "bg-blue-500 text-white",
             )}
           >
             {isActive ? (
@@ -189,43 +245,65 @@ export default function Focus() {
               <Play className="w-10 h-10 fill-current ml-2" />
             )}
           </button>
-          
+
           <button
-            onClick={() => {
-              setIsActive(false);
-              setTime(totalTime);
-              setSessions(s => s + 1);
-            }}
+            onClick={() => completeCurrentSession(true)}
             title="Complete session"
-            className="w-14 h-14 rounded-full bg-secondary/80 backdrop-blur flex items-center justify-center text-muted-foreground hover:text-green-500 hover:bg-green-500/10 hover:border-green-500/30 transition-all shadow-sm border border-transparent hover:scale-105 active:scale-95"
+            className="w-14 h-14 rounded-full bg-secondary/80 flex items-center justify-center text-muted-foreground hover:text-green-600 transition-all shadow-sm"
           >
             <CheckCircle2 className="w-5 h-5" />
           </button>
         </div>
-
-      </div>
-      
-      {/* Session Stats (bottom) */}
-      <div className="absolute bottom-28 md:bottom-12 left-4 right-4 flex justify-center max-w-5xl mx-auto w-full px-4 pointer-events-none">
-        <div className="flex items-center justify-center gap-8 bg-card/80 backdrop-blur-xl px-8 py-4 rounded-3xl border shadow-sm w-full max-w-md pointer-events-auto">
-          <div className="flex flex-col items-center">
-            <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mb-1">Sessions</span>
-            <span className="font-display font-bold text-xl" data-testid="stat-sessions">{sessions}<span className="text-muted-foreground text-sm font-medium">/4</span></span>
-          </div>
-          <div className="w-px h-10 bg-border" />
-          <div className="flex flex-col items-center">
-            <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mb-1">Time Focused</span>
-            <span className="font-display font-bold text-xl" data-testid="stat-focus-time">
-              {totalFocusTime >= 3600
-                ? `${Math.floor(totalFocusTime / 3600)}h ${Math.floor((totalFocusTime % 3600) / 60)}m`
-                : totalFocusTime >= 60
-                  ? `${Math.floor(totalFocusTime / 60)}m`
-                  : `${totalFocusTime}s`}
-            </span>
-          </div>
-        </div>
       </div>
 
+      <div className="mt-10 w-full grid md:grid-cols-2 gap-4">
+        <section className="bg-card/90 border rounded-2xl p-4">
+          <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3">
+            Today
+          </h3>
+          <div className="flex items-center justify-between text-sm mb-2">
+            <span>Completed focus sessions</span>
+            <span className="font-semibold">{todaySessions.length}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span>Total focused</span>
+            <span className="font-semibold">{formatSeconds(focusedTodaySeconds)}</span>
+          </div>
+        </section>
+
+        <section className="bg-card/90 border rounded-2xl p-4">
+          <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3">
+            Recent Sessions
+          </h3>
+          {focusSessionsQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading session history...</p>
+          ) : sessions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No sessions logged yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {sessions.slice(0, 5).map((session) => (
+                <div
+                  key={session.id}
+                  className="border rounded-lg px-3 py-2 text-sm flex items-center justify-between"
+                >
+                  <div>
+                    <p className="font-medium">
+                      {session.taskTitle || "Untitled session"}
+                    </p>
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {session.mode} • {format(new Date(session.createdAt), "MMM d, h:mm a")}
+                    </p>
+                  </div>
+                  <span className="text-xs flex items-center gap-1">
+                    <Clock3 className="w-3 h-3" />
+                    {formatSeconds(session.durationSeconds)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

@@ -235,7 +235,7 @@ function createMemoryStorage(): IStorage {
         title: blueprint.title,
         description: blueprint.description ?? "",
         category: blueprint.category ?? "General",
-        items: blueprint.items,
+        items: blueprint.items ?? [],
         createdAt: new Date(),
         updatedAt: new Date(),
       };
